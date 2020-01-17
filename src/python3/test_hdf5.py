@@ -63,7 +63,7 @@ def assert_equal_data(data_imported, data_expected, max_recursion_depth=10):
 
 
 def export_to_datadir():
-    filename = "data/exported.hdf5"
+    filename = "data/exported_python3.hdf5"
     data = gen_example_data()
     with h5py.File(filename, 'w') as f:
         hdf5_io.dump_to_hdf5(f, data)
