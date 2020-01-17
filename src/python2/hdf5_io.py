@@ -1,5 +1,8 @@
 """Tools to save and load data (from TeNPy) to disk.
 
+.. note ::
+    This file is maintained in the repository https://github.com/tenpy/hdf5_io.git
+
 The functions :func:`dump` and :func:`load` are convenience functions for saving and loading
 quite general python objects (like dictionaries) to/from files, guessing the file type
 (and hence protocol for reading/writing) from the file ending.
@@ -27,7 +30,6 @@ Names for the ``ATTR_TYPE`` attribute:
 .. autodata:: REPR_DICT_SIMPLE
 
 .. autodata:: TYPES_FOR_HDF5_DATASETS
-
 """
 # Copyright 2020 TeNPy Developers, GNU GPLv3
 
@@ -123,8 +125,8 @@ REPR_HDF5EXPORTABLE = np.string_("instance")
 
 REPR_ARRAY = np.string_("array")  #: saved object represents a numpy array
 REPR_INT = np.string_("int")  #: saved object represents a (python) int
-REPR_FLOAT = np.string_("float")  #: saved object represnts a (python) float
-REPR_STR = np.string_("str")  #: saved object represnts a (python) string
+REPR_FLOAT = np.string_("float")  #: saved object represents a (python) float
+REPR_STR = np.string_("str")  #: saved object represents a (python unicode) string
 REPR_COMPLEX = np.string_("complex")  #: saved object represents a complex number
 REPR_INT64 = np.string_("np.int64")  #: saved object represents a np.int64
 REPR_FLOAT64 = np.string_("np.float64")  #: saved object represents a np.float64
@@ -132,7 +134,7 @@ REPR_INT32 = np.string_("np.int32")  #: saved object represents a np.int32
 REPR_FLOAT32 = np.string_("np.float32")  #: saved object represents a np.float32
 
 REPR_NONE = np.string_("None")  #: saved object is ``None``
-REPR_RANGE = np.string_("range")  #: saved object is ``None``
+REPR_RANGE = np.string_("range")  #: saved object is a range
 REPR_LIST = np.string_("list")  #: saved object represents a list
 REPR_TUPLE = np.string_("tuple")  #: saved object represents a tuple
 REPR_SET = np.string_("set")  #: saved object represents a set
@@ -184,7 +186,7 @@ class Hdf5ImportError(Hdf5FormatError):
     pass
 
 
-class Hdf5Exportable:
+class Hdf5Exportable(object):
     """Interface specification for a class to be exportable to our HDF5 format.
 
     To allow a class to be exported to HDF5 with :func:`dump_to_hdf5`,
@@ -354,7 +356,8 @@ class Hdf5Saver:
             # so it does not need an explicit reference of `obj`
             h5gr, subpath = self.create_group_for_obj(path, obj)
             h5gr.attrs[ATTR_TYPE] = REPR_HDF5EXPORTABLE
-            h5gr.attrs[ATTR_CLASS] = type(obj).__qualname__
+            h5gr.attrs[ATTR_CLASS] = type(obj).__name__  # preferably __qualname,
+            # but that doesn't exist in python 2.7
             h5gr.attrs[ATTR_MODULE] = type(obj).__module__
             obj_save_hdf5(self, h5gr, subpath)  # should save the actual data
             return h5gr
@@ -440,6 +443,14 @@ class Hdf5Saver:
 
     for _t, _type_repr in TYPES_FOR_HDF5_DATASETS:
         dispatch[_t] = (save_dataset, _type_repr)
+    dispatch[unicode] = (save_dataset, REPR_STR)
+
+    def save_string(self, obj, path, type_repr):
+        self.h5group[path] = obj.decode()  # save all strings as unicode strings!
+        h5gr = self.h5group[path]
+        h5gr.attrs[ATTR_TYPE] = type_repr
+        return h5gr
+    dispatch[str] = (save_string, REPR_STR)
 
     def save_iterable(self, obj, path, type_repr):
         """Save an iterable `obj` like a list, tuple or set; in dispatch table."""
@@ -522,12 +533,23 @@ class Hdf5Saver:
         """Save a range object; in dispatch table."""
         h5gr, subpath = self.create_group_for_obj(path, obj)
         h5gr.attrs[ATTR_TYPE] = REPR_RANGE
-        self.dump(obj.start, subpath + 'start')
-        self.dump(obj.stop, subpath + 'stop')
-        self.dump(obj.step, subpath + 'step')
+        # there is no direct way to read out the start, stop and step
+        # hack: repr() displays 'xrange(...)'
+        args = repr(obj)[7:-1].split(',')
+        if len(args) == 1:
+            start = 0
+            stop = int(args[0])
+            step = 1
+        elif len(args) == 2:
+            start, stop = [int(a) for a in args]
+            step = 1
+        else:
+            start, stop, step = [int(a) for a in args]
+        self.dump(start, subpath + 'start')
+        self.dump(stop, subpath + 'stop')
+        self.dump(step, subpath + 'step')
         return h5gr
-
-    dispatch[range] = (save_range, REPR_RANGE)
+    dispatch[xrange] = (save_range, REPR_RANGE)
 
     def save_dtype(self, obj, path, type_repr):
         """Save a :class:`~numpy.dtype` object; in dispatch table."""
@@ -666,11 +688,7 @@ class Hdf5Loader:
         mod = importlib.import_module(module)
         cls = mod
         for subpath in classname.split('.'):
-            try:
-                cls = getattr(cls, subpath)
-            except AttributeError:
-                raise Hdf5ImportError("Can't find attribute {!r} on {!r} for loading {!r}".format(
-                    subpath, cls, classname)) from None
+            cls = getattr(cls, subpath)
         return cls
 
     dispatch = {}
@@ -777,7 +795,7 @@ class Hdf5Loader:
         start = self.load(subpath + 'start')
         stop = self.load(subpath + 'stop')
         step = self.load(subpath + 'step')
-        obj = range(start, stop, step)
+        obj = xrange(start, stop, step)
         self.memorize(h5gr, obj)  # late, but subgroups should only be int's; no cyclic reference
         return obj
 

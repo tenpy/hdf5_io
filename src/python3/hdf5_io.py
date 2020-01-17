@@ -1,5 +1,8 @@
 """Tools to save and load data (from TeNPy) to disk.
 
+.. note ::
+    This file is maintained in the repository https://github.com/tenpy/hdf5_io.git
+
 The functions :func:`dump` and :func:`load` are convenience functions for saving and loading
 quite general python objects (like dictionaries) to/from files, guessing the file type
 (and hence protocol for reading/writing) from the file ending.
@@ -27,7 +30,6 @@ Names for the ``ATTR_TYPE`` attribute:
 .. autodata:: REPR_DICT_SIMPLE
 
 .. autodata:: TYPES_FOR_HDF5_DATASETS
-
 """
 # Copyright 2020 TeNPy Developers, GNU GPLv3
 
@@ -123,8 +125,8 @@ REPR_HDF5EXPORTABLE = np.string_("instance")
 
 REPR_ARRAY = np.string_("array")  #: saved object represents a numpy array
 REPR_INT = np.string_("int")  #: saved object represents a (python) int
-REPR_FLOAT = np.string_("float")  #: saved object represnts a (python) float
-REPR_STR = np.string_("str")  #: saved object represnts a (python) string
+REPR_FLOAT = np.string_("float")  #: saved object represents a (python) float
+REPR_STR = np.string_("str")  #: saved object represents a (python unicode) string
 REPR_COMPLEX = np.string_("complex")  #: saved object represents a complex number
 REPR_INT64 = np.string_("np.int64")  #: saved object represents a np.int64
 REPR_FLOAT64 = np.string_("np.float64")  #: saved object represents a np.float64
@@ -132,7 +134,7 @@ REPR_INT32 = np.string_("np.int32")  #: saved object represents a np.int32
 REPR_FLOAT32 = np.string_("np.float32")  #: saved object represents a np.float32
 
 REPR_NONE = np.string_("None")  #: saved object is ``None``
-REPR_RANGE = np.string_("range")  #: saved object is ``None``
+REPR_RANGE = np.string_("range")  #: saved object is a range
 REPR_LIST = np.string_("list")  #: saved object represents a list
 REPR_TUPLE = np.string_("tuple")  #: saved object represents a tuple
 REPR_SET = np.string_("set")  #: saved object represents a set
@@ -656,6 +658,8 @@ class Hdf5Loader:
         if res is None:
             msg = "missing attribute {0!r} for dataset {1!s}"
             raise Hdf5ImportError(msg.format(attr_name, h5gr.name))
+        if type(res) == bytes:  # not isinsance: exclude np.string_
+            res = res.decode()
         return res
 
     @staticmethod

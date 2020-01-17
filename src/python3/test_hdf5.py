@@ -60,6 +60,8 @@ def assert_equal_data(data_imported, data_expected, max_recursion_depth=10):
         np.testing.assert_array_equal(data_imported, data_expected)
     elif isinstance(data_expected, (int, float, np.int64, np.float64)):
         assert data_imported == data_expected
+    elif isinstance(data_expected, range):
+        assert tuple(data_imported) == tuple(data_expected)
 
 
 def export_to_datadir():
@@ -72,11 +74,11 @@ def export_to_datadir():
 def test_hdf5_export_import():
     """Try subsequent export and import to pickle."""
     data = gen_example_data()
-    with tempfile.TemporaryFile() as tf:
-        with h5py.File(tf, 'w') as f:
+    with tempfile.TemporaryDirectory() as tf:
+        filename = 'test.hdf5'
+        with h5py.File(filename, 'w') as f:
             hdf5_io.dump_to_hdf5(f, data)
-        tf.seek(0)  # reset pointer to beginning of file for reading
-        with h5py.File(tf, 'r') as f:
+        with h5py.File(filename, 'r') as f:
             data_imported = hdf5_io.load_from_hdf5(f)
     assert_equal_data(data_imported, data)
 

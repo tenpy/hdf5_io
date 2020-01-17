@@ -33,7 +33,7 @@ def gen_example_data():
             (1, 2): '3'
         },
         'exportable': hdf5_io.Hdf5Exportable(),
-        'range': range(2, 8, 3),
+        'range': xrange(2, 8, 3),
         'dtypes': [np.dtype("int64"),
                    np.dtype([('a', np.int32, 8), ('b', np.float64, 5)])],
     }
@@ -60,6 +60,8 @@ def assert_equal_data(data_imported, data_expected, max_recursion_depth=10):
         np.testing.assert_array_equal(data_imported, data_expected)
     elif isinstance(data_expected, (int, float, np.int64, np.float64)):
         assert data_imported == data_expected
+    elif isinstance(data_expected, xrange):
+        assert tuple(data_imported) == tuple(data_expected)
 
 
 def export_to_datadir():
