@@ -23,7 +23,7 @@ Names for the ``ATTR_TYPE`` attribute:
 .. autodata:: REPR_LIST
 .. autodata:: REPR_SET
 .. autodata:: REPR_TUPLE
-.. autodata:: REPR_DICT
+.. autodata:: REPR_DICT_GENERAL
 .. autodata:: REPR_DICT_SIMPLE
 
 .. autodata:: TYPES_FOR_HDF5_DATASETS
@@ -136,7 +136,7 @@ REPR_RANGE = np.string_("range")  #: saved object is ``None``
 REPR_LIST = np.string_("list")  #: saved object represents a list
 REPR_TUPLE = np.string_("tuple")  #: saved object represents a tuple
 REPR_SET = np.string_("set")  #: saved object represents a set
-REPR_DICT = np.string_("dict")  #: saved object represents a dict with complicated keys
+REPR_DICT_GENERAL = np.string_("dict")  #: saved object represents a dict with complicated keys
 REPR_DICT_SIMPLE = np.string_("simple_dict")  #: saved object represents a dict with simple keys
 REPR_DTYPE = np.string_("dtype")  #: saved object represents a np.dtype
 
@@ -158,6 +158,15 @@ ATTR_CLASS = "class"  #: Attribute name for the class name of an HDF5Exportable
 ATTR_MODULE = "module"  #: Attribute name for the module where ATTR_CLASS can be retrieved
 ATTR_LEN = "len"  #: Attribute name for the length of iterables, e.g, list, tuple
 ATTR_FORMAT = "format"  #: indicates the `ATTR_TYPE` format used by :class:`Hdf5Exportable`
+
+
+def valid_hdf5_path_component(name):
+    """Determine if `name` is a valid HDF5 path component.
+
+    Conditions: String, no ``'/'``, and overall ``name != '.'``.
+    """
+    # unicode is encoded correctly by h5py and works - amazing!
+    return isinstance(name, str) and '/' not in name and name != '.'
 
 
 class Hdf5FormatError(Exception):
@@ -466,13 +475,13 @@ class Hdf5Saver:
         h5gr.attrs[ATTR_TYPE] = type_repr
         return h5gr
 
-    dispatch[dict] = (save_dict, REPR_DICT)
+    dispatch[dict] = (save_dict, REPR_DICT_GENERAL)
 
     def save_dict_content(self, obj, h5gr, subpath):
         """Save contents of a dictionary `obj` in the existing `h5gr`.
 
-        The format depends on whether the dictionary `obj` has simple keys (only strings which are
-        valid python variable names) or not.
+        The format depends on whether the dictionary `obj` has simple keys valid for hdf5 path
+        components (see :func:`valid_hdf5_path_component`) or not.
         For simple keys: directly use the keys as path.
         For non-simple keys: save list of keys und ``"keys"`` and list of values und ``"values"``.
 
@@ -487,18 +496,14 @@ class Hdf5Saver:
 
         Returns
         -------
-        type_repr : REPR_DICT | REPR_DICT_SIMPLE
+        type_repr : REPR_DICT_SIMPLE | REPR_DICT_GENERAL
             Indicates whether the data was saved in the format for a dictionary with simple keys
-            (i.e., using the keys for paths of hdf5 subgroups and datasets) or general keys
-            (i.e., saving keys and values separately).
+            or general keys, see comment above.
         """
         # check if we have only simple keys, which we can use in `path`
         simple_keys = True
         for k in obj.keys():
-            if not isinstance(k, str) or not k.isidentifier():
-                # isidentifier checks that `k` is a valid name for a python variable, which
-                # is sufficiently simple to allow using them in the `path` for the hdf5
-                # dataset (in particular, it does not contain '/' creating unwanted subgroups).
+            if not valid_hdf5_path_component(k):
                 simple_keys = False
                 break
 
@@ -511,7 +516,7 @@ class Hdf5Saver:
             values = obj.values()
             self.save_iterable(keys, subpath + "keys", REPR_LIST)
             self.save_iterable(values, subpath + "values", REPR_LIST)
-            return REPR_DICT
+            return REPR_DICT_GENERAL
 
     def save_range(self, obj, path, type_repr):
         """Save a range object; in dispatch table."""
@@ -739,7 +744,7 @@ class Hdf5Loader:
 
     def load_dict(self, h5gr, type_info, subpath):
         """Load a dictionary in the format according to `type_info`."""
-        if type_info == REPR_DICT:
+        if type_info == REPR_DICT_GENERAL:
             return self.load_general_dict(h5gr, type_info, subpath)
         elif type_info == REPR_DICT_SIMPLE:
             return self.load_simple_dict(h5gr, type_info, subpath)
@@ -754,7 +759,7 @@ class Hdf5Loader:
         obj.update(zip(keys, values))
         return obj
 
-    dispatch[REPR_DICT] = (load_general_dict, REPR_DICT)
+    dispatch[REPR_DICT_GENERAL] = (load_general_dict, REPR_DICT_GENERAL)
 
     def load_simple_dict(self, h5gr, type_info, subpath):
         """Load a dictionary with simple keys."""
