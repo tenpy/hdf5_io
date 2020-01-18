@@ -356,8 +356,8 @@ class Hdf5Saver:
             # so it does not need an explicit reference of `obj`
             h5gr, subpath = self.create_group_for_obj(path, obj)
             h5gr.attrs[ATTR_TYPE] = REPR_HDF5EXPORTABLE
-            h5gr.attrs[ATTR_CLASS] = type(obj).__qualname__
-            h5gr.attrs[ATTR_MODULE] = type(obj).__module__
+            h5gr.attrs[ATTR_CLASS] = obj.__class__.__qualname__
+            h5gr.attrs[ATTR_MODULE] = obj.__class__.__module__
             obj_save_hdf5(self, h5gr, subpath)  # should save the actual data
             return h5gr
 

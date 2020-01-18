@@ -356,9 +356,9 @@ class Hdf5Saver:
             # so it does not need an explicit reference of `obj`
             h5gr, subpath = self.create_group_for_obj(path, obj)
             h5gr.attrs[ATTR_TYPE] = REPR_HDF5EXPORTABLE
-            h5gr.attrs[ATTR_CLASS] = type(obj).__name__  # preferably __qualname,
+            h5gr.attrs[ATTR_CLASS] = obj.__class__.__name__  # preferably __qualname,
             # but that doesn't exist in python 2.7
-            h5gr.attrs[ATTR_MODULE] = type(obj).__module__
+            h5gr.attrs[ATTR_MODULE] = obj.__class__.__module__
             obj_save_hdf5(self, h5gr, subpath)  # should save the actual data
             return h5gr
 

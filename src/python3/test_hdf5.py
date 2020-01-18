@@ -74,11 +74,11 @@ def export_to_datadir():
 def test_hdf5_export_import():
     """Try subsequent export and import to pickle."""
     data = gen_example_data()
-    with tempfile.TemporaryDirectory() as tf:
+    with tempfile.TemporaryDirectory() as tdir:
         filename = 'test.hdf5'
-        with h5py.File(filename, 'w') as f:
+        with h5py.File(os.path.join(tdir, filename), 'w') as f:
             hdf5_io.dump_to_hdf5(f, data)
-        with h5py.File(filename, 'r') as f:
+        with h5py.File(os.path.join(tdir, filename), 'r') as f:
             data_imported = hdf5_io.load_from_hdf5(f)
     assert_equal_data(data_imported, data)
 
