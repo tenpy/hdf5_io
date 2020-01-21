@@ -74,12 +74,20 @@ def export_to_datadir():
 def test_hdf5_export_import():
     """Try subsequent export and import to pickle."""
     data = gen_example_data()
+    data_with_ignore = data.copy()
+    data_with_ignore['ignore_save'] = hdf5_io.Hdf5Ignored()
     with tempfile.TemporaryFile() as tf:
         with h5py.File(tf, 'w') as f:
             hdf5_io.dump_to_hdf5(f, data)
+            f['ignore_load'] = "ignore_during_load"
+            f['ignore_load'].attrs[hdf5_io.ATTR_TYPE] = hdf5_io.REPR_IGNORED
         tf.seek(0)  # reset pointer to beginning of file for reading
         with h5py.File(tf, 'r') as f:
             data_imported = hdf5_io.load_from_hdf5(f)
+        # data is a dict with simple keys
+        # so 'ignore_load' should be loaded as Hdf5Ignored instance
+        assert isinstance(data_imported['ignore_load'], hdf5_io.Hdf5Ignored)
+        del data_imported['ignore_load']
     assert_equal_data(data_imported, data)
 
 

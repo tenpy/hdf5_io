@@ -1,7 +1,7 @@
 """Tools to save and load data (from TeNPy) to disk.
 
 .. note ::
-    This file is maintained in the repository https://github.com/tenpy/hdf5_io.git
+    This module is maintained in the repository https://github.com/tenpy/hdf5_io.git
 
 The functions :func:`dump` and :func:`load` are convenience functions for saving and loading
 quite general python objects (like dictionaries) to/from files, guessing the file type
@@ -41,7 +41,7 @@ import importlib
 
 __all__ = [
     'dump', 'load', 'valid_hdf5_path_component', 'Hdf5FormatError', 'Hdf5ExportError',
-    'Hdf5ImportError', 'Hdf5Exportable', 'Hdf5Saver', 'Hdf5Loader', 'dump_to_hdf5',
+    'Hdf5ImportError', 'Hdf5Exportable', 'Hdf5Ignored', 'Hdf5Saver', 'Hdf5Loader', 'dump_to_hdf5',
     'load_from_hdf5'
 ]
 
@@ -142,6 +142,7 @@ REPR_SET = np.string_("set")  #: saved object represents a set
 REPR_DICT_GENERAL = np.string_("dict")  #: saved object represents a dict with complicated keys
 REPR_DICT_SIMPLE = np.string_("simple_dict")  #: saved object represents a dict with simple keys
 REPR_DTYPE = np.string_("dtype")  #: saved object represents a np.dtype
+REPR_IGNORED = np.string_("ignore")  #: ignore the object/dataset during loading and saving
 
 #: tuple of (type, type_repr) which h5py can save as datasets; one entry for each type.
 TYPES_FOR_HDF5_DATASETS = tuple([
@@ -260,6 +261,27 @@ class Hdf5Exportable(object):
         # (the `load_dict` did not overwrite the memo entry)
         obj.__dict__.update(data)  # store data in the object
         return obj
+
+
+class Hdf5Ignored(object):
+    """Placeholder for a dataset/group to be ignored during both loading and saving.
+
+    Objects of this type are not saved.
+    Moreover, if a saved dataset/group has the `type` attribute matching `REPR_IGNORED`,
+    instance of this class are returned instead of loading the data.
+
+    Parameters
+    ----------
+    name : str
+        The name of the dataset during loading; just for reference.
+
+    Attributes
+    ----------
+    name : str
+        See above.
+    """
+    def __init__(self, name='unknown'):
+        self.name = name
 
 
 class Hdf5Saver:
@@ -563,6 +585,12 @@ class Hdf5Saver:
 
     dispatch[np.dtype] = (save_dtype, REPR_DTYPE)
 
+    def save_ignored(self, obj, path, type_repr):
+        """Don't save the Hdf5Ignored object; just return None."""
+        return None
+
+    dispatch[Hdf5Ignored] = (save_ignored, REPR_IGNORED)
+
     # clean up temporary variables
     del _t
     del _type_repr
@@ -823,6 +851,12 @@ class Hdf5Loader:
         return cls.from_hdf5(self, h5gr, subpath)
 
     dispatch[REPR_HDF5EXPORTABLE] = (load_hdf5exportable, REPR_HDF5EXPORTABLE)
+
+    def load_ignored(self, h5gr, type_info, subpath):
+        """Ignore the group to be loaded."""
+        return Hdf5Ignored(h5gr.name)
+
+    dispatch[REPR_IGNORED] = (load_ignored, REPR_IGNORED)
 
     # clean up temporary variables
     del _t
