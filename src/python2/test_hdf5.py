@@ -68,7 +68,7 @@ def export_to_datadir():
     filename = "data/exported_python2.hdf5"
     data = gen_example_data()
     with h5py.File(filename, 'w') as f:
-        hdf5_io.dump_to_hdf5(f, data)
+        hdf5_io.save_to_hdf5(f, data)
 
 
 def test_hdf5_export_import():
@@ -78,7 +78,7 @@ def test_hdf5_export_import():
     data_with_ignore['ignore_save'] = hdf5_io.Hdf5Ignored()
     with tempfile.TemporaryFile() as tf:
         with h5py.File(tf, 'w') as f:
-            hdf5_io.dump_to_hdf5(f, data)
+            hdf5_io.save_to_hdf5(f, data)
             f['ignore_load'] = "ignore_during_load"
             f['ignore_load'].attrs[hdf5_io.ATTR_TYPE] = hdf5_io.REPR_IGNORED
         tf.seek(0)  # reset pointer to beginning of file for reading

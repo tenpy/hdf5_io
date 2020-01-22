@@ -3,7 +3,7 @@
 .. note ::
     This module is maintained in the repository https://github.com/tenpy/hdf5_io.git
 
-The functions :func:`dump` and :func:`load` are convenience functions for saving and loading
+The functions :func:`save` and :func:`load` are convenience functions for saving and loading
 quite general python objects (like dictionaries) to/from files, guessing the file type
 (and hence protocol for reading/writing) from the file ending.
 
@@ -40,13 +40,13 @@ import numpy as np
 import importlib
 
 __all__ = [
-    'dump', 'load', 'valid_hdf5_path_component', 'Hdf5FormatError', 'Hdf5ExportError',
-    'Hdf5ImportError', 'Hdf5Exportable', 'Hdf5Ignored', 'Hdf5Saver', 'Hdf5Loader', 'dump_to_hdf5',
+    'save', 'load', 'valid_hdf5_path_component', 'Hdf5FormatError', 'Hdf5ExportError',
+    'Hdf5ImportError', 'Hdf5Exportable', 'Hdf5Ignored', 'Hdf5Saver', 'Hdf5Loader', 'save_to_hdf5',
     'load_from_hdf5'
 ]
 
 
-def dump(data, filename, mode='w'):
+def save(data, filename, mode='w'):
     """Save `data` to file with given `filename`.
 
     This function guesses the type of the file from the filename ending.
@@ -81,7 +81,7 @@ def dump(data, filename, mode='w'):
     elif filename.endswith('.hdf5'):
         import h5py
         with h5py.File(filename, mode) as f:
-            dump_to_hdf5(f, obj)
+            save_to_hdf5(f, obj)
     else:
         raise ValueError("Don't recognise file ending of " + repr(filename))
 
@@ -89,7 +89,7 @@ def dump(data, filename, mode='w'):
 def load(filename):
     """Load data from file with given `filename`.
 
-    Guess the type of the file from the filename ending, see :func:`dump` for possible endings.
+    Guess the type of the file from the filename ending, see :func:`save` for possible endings.
 
     Parameters
     ----------
@@ -191,7 +191,7 @@ class Hdf5ImportError(Hdf5FormatError):
 class Hdf5Exportable:
     """Interface specification for a class to be exportable to our HDF5 format.
 
-    To allow a class to be exported to HDF5 with :func:`dump_to_hdf5`,
+    To allow a class to be exported to HDF5 with :func:`save_to_hdf5`,
     it only needs to implement the :meth:`save_hdf5` method as documented below.
     To allow import, a class should implement the classmethod :meth:`from_hdf5`.
     During the import, the class already needs to be defined;
@@ -221,7 +221,7 @@ class Hdf5Exportable:
             The `name` of `h5gr` with a ``'/'`` in the end.
         """
         # for new implementations, use:
-        #   hdf5_saver.dump(data, subpath + "key")  # for big content/data
+        #   hdf5_saver.save(data, subpath + "key")  # for big content/data
         #   h5gr.attrs["name"] = info               # for metadata
 
         # here: assume all the data is given in self.__dict__
@@ -287,15 +287,15 @@ class Hdf5Ignored:
 class Hdf5Saver:
     """Engine to save simple enough objects into a HDF5 file.
 
-    The intended use of this class is through :func:`dump_to_hdf5`, which is simply an alias
-    for ``Hdf5Saver(h5group).dump(obj, path)``.
+    The intended use of this class is through :func:`save_to_hdf5`, which is simply an alias
+    for ``Hdf5Saver(h5group).save(obj, path)``.
 
     It exports python objects to a HDF5 file such that they can be loaded with the
     :class:`Hdf5Loader`, or a call to :func:`load_from_hdf5`, respectively.
 
     The basic structure of this class is similar as the `Pickler` from :mod:`pickle`.
 
-    See :doc:`/intro/input_output` for a specification of what can be dumped and what the resulting
+    See :doc:`/intro/input_output` for a specification of what can be saved and what the resulting
     datastructure is.
 
     Parameters
@@ -334,7 +334,7 @@ class Hdf5Saver:
             format_selection = {}
         self.format_selection = format_selection
 
-    def dump(self, obj, path='/'):
+    def save(self, obj, path='/'):
         """Save `obj` in ``self.h5group[path]``.
 
         Parameters
@@ -385,7 +385,7 @@ class Hdf5Saver:
             return h5gr
 
         # unknown case
-        msg = "Don't know how to dump object of type {0!r}".format(type(obj))
+        msg = "Don't know how to save object of type {0!r}".format(type(obj))
         raise Hdf5ExportError(msg)
 
     def create_group_for_obj(self, path, obj):
@@ -493,7 +493,7 @@ class Hdf5Saver:
         """
         h5gr.attrs[ATTR_LEN] = len(obj)
         for i, elem in enumerate(obj):
-            self.dump(elem, subpath + str(i))
+            self.save(elem, subpath + str(i))
 
     def save_dict(self, obj, path, type_repr):
         """Save the dictionary `obj`; in dispatch table."""
@@ -536,7 +536,7 @@ class Hdf5Saver:
 
         if simple_keys:
             for k, v in obj.items():
-                self.dump(v, subpath + k)
+                self.save(v, subpath + k)
             return REPR_DICT_SIMPLE
         else:
             keys = obj.keys()
@@ -549,9 +549,9 @@ class Hdf5Saver:
         """Save a range object; in dispatch table."""
         h5gr, subpath = self.create_group_for_obj(path, obj)
         h5gr.attrs[ATTR_TYPE] = REPR_RANGE
-        self.dump(obj.start, subpath + 'start')
-        self.dump(obj.stop, subpath + 'stop')
-        self.dump(obj.step, subpath + 'step')
+        self.save(obj.start, subpath + 'start')
+        self.save(obj.stop, subpath + 'stop')
+        self.save(obj.step, subpath + 'step')
         return h5gr
 
     dispatch_save[range] = (save_range, REPR_RANGE)
@@ -562,7 +562,7 @@ class Hdf5Saver:
         h5gr.attrs[ATTR_TYPE] = REPR_DTYPE
         name = getattr(obj, "name", "void")
         h5gr.attrs["name"] = name
-        self.dump(obj.descr, subpath + 'descr')
+        self.save(obj.descr, subpath + 'descr')
         return h5gr
 
     dispatch_save[np.dtype] = (save_dtype, REPR_DTYPE)
@@ -584,11 +584,11 @@ class Hdf5Loader:
     The intended use of this class is through :func:`load_from_hdf5`, which is simply an alias
     for ``Hdf5Loader(h5group).load(path)``.
 
-    It can load data exported with :func:`dump_to_hdf5` or the :class:`Hdf5Saver`, respectively.
+    It can load data exported with :func:`save_to_hdf5` or the :class:`Hdf5Saver`, respectively.
 
     The basic structure of this class is similar as the `Unpickler` from :mod:`pickle`.
 
-    See :doc:`/intro/input_output` for a specification of what can be dumped and what the resulting
+    See :doc:`/intro/input_output` for a specification of what can be saved and what the resulting
     datastructure is.
 
     Parameters
@@ -852,12 +852,12 @@ class Hdf5Loader:
     del _type_repr
 
 
-def dump_to_hdf5(h5group, obj, path='/'):
+def save_to_hdf5(h5group, obj, path='/'):
     """Save an object `obj` into a hdf5 file or group.
 
     Roughly equivalent to ``h5group[path] = obj``, but handle different types of `obj`.
     For example, dictionaries are handled recursively.
-    See :doc:`/intro/input_output` for a specification of what can be dumped and what the resulting
+    See :doc:`/intro/input_output` for a specification of what can be saved and what the resulting
     datastructure is.
 
     Parameters
@@ -876,16 +876,16 @@ def dump_to_hdf5(h5group, obj, path='/'):
     h5obj : :class:`Group` | :class:`Dataset`
         The h5py group or dataset under which `obj` was saved.
     """
-    return Hdf5Saver(h5group).dump(obj, path)
+    return Hdf5Saver(h5group).save(obj, path)
 
 
 def load_from_hdf5(h5group, path=None):
     """Load an object from hdf5 file or group.
 
     Roughly equivalent to ``obj = h5group[path][...]``, but handle more complicated objects saved
-    as hdf5 groups and/or datasets with :func:`dump_to_hdf5`.
+    as hdf5 groups and/or datasets with :func:`save_to_hdf5`.
     For example, dictionaries are handled recursively.
-    See :doc:`/intro/input_output` for a specification of what can be dumped/loaded and what the
+    See :doc:`/intro/input_output` for a specification of what can be saved/loaded and what the
     corresponding datastructure is.
 
     Parameters
