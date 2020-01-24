@@ -38,6 +38,7 @@ import gzip
 import types
 import numpy as np
 import importlib
+import warnings
 
 __all__ = [
     'save', 'load', 'valid_hdf5_path_component', 'Hdf5FormatError', 'Hdf5ExportError',
@@ -320,7 +321,7 @@ class Hdf5Saver:
         in ``Hdf5Loader.dispatch_save[type_repr]``.
     memo_save : dict
         A dictionary to remember all the objects which we already stored to :attr:`h5group`.
-        The dictionary keys are object ids; the values are two-tuples of the hdf5 group or dataset
+        The dictionary key is the object id; the value is a two-tuple of the hdf5 group or dataset
         where an object was stored, and the object itself. See :meth:`memorize_save`.
     format_selection : dict
         This dictionary allows to set a output format selection for user-defined
@@ -618,11 +619,15 @@ class Hdf5Loader:
     ----------
     h5group : :class:`Group`
         The HDF5 group (or file) where to save the data.
+    ignore_unknown : bool
+        Whether to just warn (True) or raise an Error (False) if a class to be loaded is not found.
 
     Attributes
     ----------
     h5group : :class:`Group`
         The HDF5 group (or HDF5 :class:`File`) where to save the data.
+    ignore_unknown : bool
+        Whether to just warn (True) or raise an Error (False) if a class to be loaded is not found.
     dispatch_load : dict
         Mapping from a :class:`np.string_`, which is one of the global ``REPR_*`` variables,
         to methods `f` of this class.
@@ -634,11 +639,12 @@ class Hdf5Loader:
         the type, which allows to use a single dispatch_load function for different datatypes.
     memo_load : dict
         A dictionary to remember all the objects which we already loaded from :attr:`h5group`.
-        The dictionary keys are h5py Group- or dataset ``id``;
-        the values are the loaded objects. See :meth:`memorize_load`.
+        The dictionary key is a h5py group- or dataset ``id``;
+        the value is the loaded object. See :meth:`memorize_load`.
     """
-    def __init__(self, h5group):
+    def __init__(self, h5group, ignore_unknown=True):
         self.h5group = h5group
+        self.ignore_unknown = ignore_unknown
         self.memo_load = {}
 
     def load(self, path=None):
@@ -851,9 +857,17 @@ class Hdf5Loader:
 
     def load_hdf5exportable(self, h5gr, type_info, subpath):
         """Load an instance of a userdefined class."""
-        modulename = self.get_attr(h5gr, ATTR_MODULE)
-        classname = self.get_attr(h5gr, ATTR_CLASS)
-        cls = self.find_class(modulename, classname)
+        module_name = self.get_attr(h5gr, ATTR_MODULE)
+        class_name = self.get_attr(h5gr, ATTR_CLASS)
+        try:
+            cls = self.find_class(module_name, class_name)
+        except (ImportError, AttributeError):
+            msg = "Can't import class {0!s} from {1!s}".format(class_name, module_name)
+            if self.ignore_unknown:
+                warnings.warn(msg, UserWarning)
+                return Hdf5Ignored(msg)
+            else:
+                raise
         return cls.from_hdf5(self, h5gr, subpath)
 
     dispatch_load[REPR_HDF5EXPORTABLE] = (load_hdf5exportable, REPR_HDF5EXPORTABLE)
@@ -896,7 +910,7 @@ def save_to_hdf5(h5group, obj, path='/'):
     return Hdf5Saver(h5group).save(obj, path)
 
 
-def load_from_hdf5(h5group, path=None):
+def load_from_hdf5(h5group, path=None, ignore_unknown=True):
     """Load an object from hdf5 file or group.
 
     Roughly equivalent to ``obj = h5group[path][...]``, but handle more complicated objects saved
@@ -911,10 +925,12 @@ def load_from_hdf5(h5group, path=None):
         The HDF5 group (or h5py :class:`File`) to be loaded.
     path : None | str | :class:`Reference`
         Path within `h5group` to be used for loading. Defaults to the `h5group` itself specified.
+    ignore_unknown : bool
+        Whether to just warn (True) or raise an Error (False) if a class to be loaded is not found.
 
     Returns
     -------
     obj : object
         The Python object loaded from `h5group` (specified by `path`).
     """
-    return Hdf5Loader(h5group).load(path)
+    return Hdf5Loader(h5group, ignore_unknown).load(path)
