@@ -15,8 +15,11 @@ from hdf5_io import ATTR_TYPE, ATTR_CLASS, ATTR_MODULE, REPR_HDF5EXPORTABLE, REP
 import importlib
 
 
-BACKUP_PATH = "/backup_pre_convert"   # path of (temporary) group inside the file
+BACKUP_PATH = "/backup_pre_convert"   #: path of (temporary) group inside the file
 # to move groups to be converted into.
+
+ATTR_ORIG_PATH = "original_path"  #: Attribute name for path before moving a group to BACKUP_PATH
+# for conversion
 
 
 __all__ = ['BACKUP_PATH', 'convert_file', 'parse_args', 'main']
@@ -81,7 +84,9 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
             self.backup_gr = self.h5group.create_group(BACKUP_PATH)
             self.backup_gr.attrs[ATTR_TYPE] = REPR_IGNORED
         else:
-            self.backup_gr = self.h5group[BACKUP_PATH]
+            self.backup_gr = backup_gr = self.h5group[BACKUP_PATH]
+            for subgr in backup_gr.values():
+                self.memorize_convert(subgr)
         self.memorize_convert(self.backup_gr)  # exclude backup path for conversion
 
 
@@ -142,13 +147,18 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
 
         new_module_name, new_class_name, map_function = mapping
         orig_path = h5gr.name
-        moved_path = BACKUP_PATH + h5gr.name
+        counter = len(self.backup_gr)
+        moved_path =  '/'.join([BACKUP_PATH, str(counter)])
+        while moved_path in h5gr:
+            counter += 1
+            moved_path = '/'.join([BACKUP_PATH, str(counter)])
         if self.verbose > 1:
-            print("converting group {0!r} from {1!s} to {2!s}"
-                  .format(h5gr.name, class_name, new_class_name))
+            print("converting group {0!r} from {1!s} to {2!s}, backup {3!s}"
+                  .format(h5gr.name, class_name, new_class_name, moved_path))
         elif self.verbose:
             print("converting group", h5gr.name)
         self.h5group.move(orig_path, moved_path)  # first move to backup
+        h5gr.attrs[ATTR_ORIG_PATH] = orig_path
         h5gr_new, subpath = self.create_group_for_obj(orig_path, h5gr)  # new group for the data
         h5gr_new.attrs[ATTR_TYPE] = REPR_HDF5EXPORTABLE
         h5gr_new.attrs[ATTR_MODULE] = new_module_name
@@ -168,9 +178,23 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
 
     def recover_from_backup(self):
         """(Try to) recover the backup from :attr:`backup_gr`."""
+        h5file = self.h5group
+        backup_gr = self.backup_gr
         if self.verbose:
-            print("recovering from backup: ", self.h5group.filename)
-        raise NotImplementedError("TODO")  # TODO
+            print("recovering groups in file {0!r} from backup under {1!r}"
+                  .format(h5file.filename, backup_gr.name))
+        names = sorted(backup_gr.keys(), reverse=True)  # reverse: handle converted subgroups
+        for name in names:
+            gr = backup_gr[name]
+            orig_path = gr.attrs[ATTR_ORIG_PATH]
+            if self.verbose:
+                print("recover original {0!r} from group {1!r}".format(orig_path, name))
+            if orig_path not in h5file:
+                warnings.warn("Expected a converted group under " + orig_path)
+            else:
+                del h5file[orig_path]
+            h5file.move(gr.name, orig_path)
+            del gr.attrs[ATTR_ORIG_PATH]
 
     def __del__(self):
         """Close the file properly when the Converter is deleted."""
@@ -184,13 +208,14 @@ def parse_args(converter_cls=None):
     parser = argparse.ArgumentParser(description=doc)
     parser.add_argument('-B',
                         '--no-backup',
-                        action="store_false",
+                        action="store_true",  # default=False
                         help="Don't keep copy of the converted Hdf5 groups inside the file "
                         "under the path {0!r}".format(BACKUP_PATH))
     parser.add_argument('-r',
                         '--recover',
                         action="store_true",
-                        help="Restore the groups from the backup under {0!r}".format(BACKUP_PATH))
+                        help="Restore the groups from the backup under {0!r} "
+                        "instead of converting something".format(BACKUP_PATH))
     parser.add_argument('-v',
                         '--verbose',
                         default=0,
@@ -199,11 +224,9 @@ def parse_args(converter_cls=None):
     if converter_cls is None:
         parser.add_argument('-f',
                             '--from-format',
-                            required=True,
                             help="From which format to convert")
         parser.add_argument('-t',
                             '--to-format',
-                            required=True,
                             help="Into which format to convert")
     parser.add_argument("files", nargs="+", help="Filenames of HDF5 files to convert (in place).")
     args = parser.parse_args()
