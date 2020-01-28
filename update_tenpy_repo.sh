@@ -27,7 +27,7 @@ then
 	exit 1 
 fi
 
-cp "$THISREPO/src/python3/hdf5_io.py" "$TENPYREPO/tenpy/tools/io.py"
+cp "$THISREPO/src/python3/hdf5_io.py" "$TENPYREPO/tenpy/tools/hdf5_io.py"
 cp "$THISREPO/doc/input_output.rst" "$TENPYREPO/doc/intro/input_output.rst"
 prompt_continue "Copied files. Continue [y/n]?"
 
