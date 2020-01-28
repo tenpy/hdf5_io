@@ -3,13 +3,14 @@
 # Try command line argument ``--help`` for options.
 
 import convert
+from convert import Hdf5Converter
 
 import tenpy  # requirement: can import the new tenpy
 import tenpy.linalg.np_conserved as npc
 import numpy as np
 
 
-class Converter(convert.Hdf5Converter):
+class Converter(Hdf5Converter):
     """Convert from the `prev_tenpy` format to the new TeNPy."""
 
     def convert_array(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
@@ -57,6 +58,8 @@ class Converter(convert.Hdf5Converter):
         h5gr_new.attrs["shape"] = shape  # same
 
     mappings = {}
+    mappings[('tools.hdf5_io', 'Hdf5Exportable')] = \
+        ('tenpy.tools.hdf5_io', 'Hdf5Exportable', Hdf5Converter.convert_Hdf5Exportable)
     mappings[('algorithms.linalg.np_conserved', 'array')] = \
         ('tenpy.linalg.np_conserved', 'Array', convert_array)
 

@@ -202,6 +202,19 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         if h5file is not None:
             h5file.close()
 
+    @staticmethod  # don't bind to self: allow subclasses to put it in `mappings`.
+    def convert_Hdf5Exportable(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
+        """Convert a group representing an `Hdf5Exportable`."""
+        # copy attributes except module, classname and type
+        excl_attr_copies = set([ATTR_MODULE, ATTR_CLASS, ATTR_TYPE])
+        for attr_name in set(h5gr_orig.attrs.keys()) - excl_attr_copies:
+            h5gr_new.attrs[attr_name] = h5gr_orig.attrs[attr_name]
+        # copy data sets
+        for subgr in h5gr_orig:
+            h5gr_new[subgr] = h5gr_orig[subgr]
+        # and convert the subgroups
+        self.convert_subgroups(h5gr_new)
+
 
 def parse_args(converter_cls=None):
     doc = converter_cls.__module__.__doc__ if converter_cls is not None else __doc__
