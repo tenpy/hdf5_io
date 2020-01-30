@@ -215,6 +215,16 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         # and convert the subgroups
         self.convert_subgroups(h5gr_new)
 
+    @classmethod
+    def print_conversions(cls):
+        """List from which class into which class conversions are done."""
+        print("Converting from {0!r} to {1!r}:".format(cls.from_format, cls.to_format))
+        line = "{0:40}.{1:20} -> {2:40}.{3:20}"
+        print(line.format("from_module", "class", "into_module", "into_class"))
+        print("="*120)
+        for from_, to_ in cls.mappings.items():
+            print(line.format(from_[0], from_[1], to_[0], to_[1]))
+
 
 def parse_args(converter_cls=None):
     doc = converter_cls.__module__.__doc__ if converter_cls is not None else __doc__
@@ -229,6 +239,10 @@ def parse_args(converter_cls=None):
                         action="store_true",
                         help="Restore the groups from the backup under {0!r} "
                         "instead of converting something".format(BACKUP_PATH))
+    parser.add_argument('-l',
+                        '--list-only',
+                        action="store_true",
+                        help="Don't convert anything, just list the classes which get converted.")
     parser.add_argument('-v',
                         '--verbose',
                         default=0,
@@ -241,7 +255,7 @@ def parse_args(converter_cls=None):
         parser.add_argument('-t',
                             '--to-format',
                             help="Into which format to convert")
-    parser.add_argument("files", nargs="+", help="Filenames of HDF5 files to convert (in place).")
+    parser.add_argument("files", nargs="*", help="Filenames of HDF5 files to convert (in place).")
     args = parser.parse_args()
     if converter_cls is not None:
         args.Converter = converter_cls
@@ -263,6 +277,9 @@ def main(args):
         Converter = args.Converter
     else:
         Converter = find_converter(args.from_format, args.to_format)
+    if args.list_only:
+        Converter.print_conversions()
+        return
     for fn in args.files:
         conv = Converter(fn, args.no_backup, args.verbose)
         if args.recover:
