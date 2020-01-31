@@ -108,12 +108,14 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         if self.verbose:
             if self.verbose > 1:
                 print("="*80)
-            print("converting file ", self.h5group.filename)
+            print("converting file", self.h5group.filename)
 
         self.convert_group(self.h5group)  # recursive
 
         # now (once that everything worked, not in __del__) we can delete the backup
         if self.no_backup:
+            if self.verbose > 1:
+                print("remove backup group", self.backup_gr.name)
             del self.h5group[self.backup_gr.name]
 
     def convert_group(self, h5gr):
