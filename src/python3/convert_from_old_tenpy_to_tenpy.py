@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Convert the format of hdf5 files from the TeNPy precursor to the new TeNPy."""
 # Try command line argument ``--help`` for options.
 
 import convert
@@ -12,10 +11,7 @@ import numpy as np
 
 
 class Converter(Hdf5Converter):
-    """Convert from the `prev_tenpy` format to the new `tenpy`."""
-
-    from_format = "prev_tenpy"  #: from which fromat the converter converts
-    to_format = "tenpy"  #: into which format the converter converts
+    """Convert from the "old" TeNpy (in python 2) to the "new" TeNPy."""
 
     mappings = {}
     mappings[('tools.hdf5_io', 'Hdf5Exportable')] = \

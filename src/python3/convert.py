@@ -220,7 +220,7 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
     @classmethod
     def print_conversions(cls):
         """List from which class into which class conversions are done."""
-        print("Converting from {0!r} to {1!r}:".format(cls.from_format, cls.to_format))
+        print(cls.__doc__)
         line = "{0:40}.{1:20} -> {2:40}.{3:20}"
         print(line.format("from_module", "class", "into_module", "into_class"))
         print("="*120)
