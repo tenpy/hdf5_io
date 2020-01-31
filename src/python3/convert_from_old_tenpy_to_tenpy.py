@@ -18,21 +18,23 @@ class Converter(Hdf5Converter):
         ('tenpy.tools.hdf5_io', 'Hdf5Exportable', Hdf5Converter.convert_Hdf5Exportable)
 
     def convert_array(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
-        # compare algorithms.linalg.np_conserved.array.from_hdf5
-        rank = h5gr_orig.attrs["rank"]  # (directly copy the attribute)
-        shape = h5gr_orig.attrs["shape"]
+        # copy (hardlinks avoid copies)
+        h5gr_new["dtype"] = h5gr_orig["dtype"]
+        h5gr_new["blocks"] = h5gr_orig["blocks"]
+        total_charge = self.get_attr(h5gr_orig, "total_charge")
+        self.save(total_charge, subpath_new + "total_charge")
+        block_inds = np.asarray(self.load(subpath_orig + "block_inds"), np.intp)
+        self.save(block_inds, subpath_new + "block_inds")
+        h5gr_new.attrs["block_inds_sorted"] = h5gr_orig.attrs["block_inds_sorted"]
+        h5gr_new.attrs["rank"] = rank = self.get_attr(h5gr_orig, "rank")
+        h5gr_new.attrs["shape"] = self.get_attr(h5gr_orig, "shape")
+
+        # convert charges
         num_q = self.get_attr(h5gr_orig, "num_charges")
         mod_q = self.get_attr(h5gr_orig, "U1_ZN")
-        total_charge = self.get_attr(h5gr_orig, "total_charge")
         leg_charges = self.load(subpath_orig + "leg_charges")
         qconj = self.get_attr(h5gr_orig, "qconj")
-        blocks = self.load(subpath_orig + "blocks")
-        block_inds = np.asarray(self.load(subpath_orig + "block_inds"), np.intp)
-        dtype = self.load(subpath_orig + "dtype")
-        block_inds_sorted = h5gr_orig.attrs["block_inds_sorted"]
-        labels = self.load(subpath_orig + "labels")
 
-        # convert the data as necessary
         # ChargeInfo
         chinfo = npc.ChargeInfo(mod_q)  # no names available
         assert chinfo.qnumber == num_q
@@ -43,31 +45,24 @@ class Converter(Hdf5Converter):
             charges = q_ind[:, 2:]
             leg = npc.LegCharge(chinfo, slices, charges, q_conj)
             legs_new.append(leg)
-        # labels: convert {str: int} -> [str]
+        self.save(chinfo, subpath_new + "chinfo")
+        self.save(legs_new, subpath_new + "legs")
+
+        labels = self.load(subpath_orig + "labels")
+        # convert {str: int} -> [str]
         labels_new = [None] * rank
         if labels is not None:
             for k, v in labels.items():
                 labels_new[v] = k
-
-        # compare tenpy.linalg.np_conserved.Array.save_hdf5
-        self.save(chinfo, subpath_new + "chinfo")
-        self.save(legs_new, subpath_new + "legs")
-        self.save(dtype, subpath_new + "dtype")
-        self.save(total_charge, subpath_new + "total_charge")
         self.save(labels_new, subpath_new + "labels")
-        self.save(blocks, subpath_new + "blocks")
-        self.save(block_inds, subpath_new + "block_inds")
-        h5gr_new.attrs["block_inds_sorted"] = block_inds_sorted
-        h5gr_new.attrs["rank"] = rank  # not needed for loading, but still usefull metadata
-        h5gr_new.attrs["shape"] = shape  # same
 
     mappings[('algorithms.linalg.np_conserved', 'array')] = \
         ('tenpy.linalg.np_conserved', 'Array', convert_array)
 
     def convert_bc(self, bc):
         """MPS/MPO boundary conditions."""
-        # prev_tenpy: bc = 'finite', 'segment', 'periodic'
-        # new  tenpy:      'finite', 'segment', 'infinite'
+        # old tenpy: bc = 'finite', 'segment', 'periodic'
+        # new tenpy:      'finite', 'segment', 'infinite'
         if bc == 'periodic':
             bc = 'infinite'
         if bc not in ['finite', 'segment', 'infinite']:
@@ -75,7 +70,7 @@ class Converter(Hdf5Converter):
         return bc
 
     def convert_MPS(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
-        L = h5gr_orig.attrs["L"]
+        L = self.get_attr(h5gr_orig, "L")
         if h5gr_orig["translate_Q1_data"].attrs[hdf5_io.ATTR_TYPE] != hdf5_io.REPR_NONE:
             raise ValueError("Can't convert MPS with non-trivial 'translate_Q1_data'")
 
@@ -101,9 +96,8 @@ class Converter(Hdf5Converter):
 
         # singular values
         SVs = self.load(subpath_orig + "singular_values")
-        # old tenpy: singular values indexed by bond b right of site b
-        # entry 0 always right of site 0, length of SVs depends on bc
-        # need new tenpy: always L+1 entries, 0 left of site 0
+        # new tenpy: bond b left  of site b, always L+1 entries
+        # old tenpy: bond b right of site b, length L+1 for segment bc, others L
         SVs = [None] + SVs  # now entry b is left of site b
         # fine for infinite bc with L+1 entries
         if bc == 'infinite':
@@ -125,30 +119,30 @@ class Converter(Hdf5Converter):
         self.save(form, subpath_new + "canonical_form")
 
         # copy metadata
-        h5gr_new.attrs["L"] = h5gr_orig.attrs["L"]
-        h5gr_new.attrs["max_bond_dimension"] = h5gr_orig.attrs["max_bond_dimension"]
+        h5gr_new.attrs["L"] = self.get_attr(h5gr_orig, "L")
+        h5gr_new.attrs["max_bond_dimension"] = self.get_attr(h5gr_orig, "max_bond_dimension")
 
         h5gr_new.attrs["norm"] = 1 # required by new TeNPy
-        h5gr_new.attrs["grouped"] = grouped = h5gr_orig.attrs["grouped"]
+        h5gr_new.attrs["grouped"] = grouped = self.get_attr(h5gr_orig, "grouped")
         if grouped > 1:
             warnings.warn("MPS with grouped sites: "
-                          "splitting afterwards is not supported in new TeNPy")
-            # still copy site_pipes: allow converting back to prev_tenpy for splitting
-            h5gr_new["site_pipes"] = h5gr_old["site_pipes"]
-        h5gr_new.attrs["_transfermatrix_keep"] = h5gr_orig.attrs["transfermatrix_keep"]
+                          "splitting after conversion not supported")
+        # still copy site_pipes: allow converting back to old tenpy for splitting
+        h5gr_new["site_pipes"] = h5gr_orig["site_pipes"]
+        h5gr_new.attrs["transfermatrix_keep"] = self.get_attr(h5gr_orig, "transfermatrix_keep")
 
 
     mappings[('mps.mps', 'iMPS')] = \
         ('tenpy.networks.mps', 'MPS', convert_MPS)
 
     def convert_MPO(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
-        L = h5gr_orig.attrs["L"]
-        if h5gr_orig["translate_Q1_data"].attrs[hdf5_io.ATTR_TYPE] != hdf5_io.REPR_NONE:
+        L = self.get_attr(h5gr_orig, "L")
+        if self.get_attr(h5gr_orig["translate_Q1_data"], hdf5_io.ATTR_TYPE) != hdf5_io.REPR_NONE:
             raise ValueError("Can't convert MPO with non-trivial 'translate_Q1_data'")
         # tensors: (implicitly) call above conversion function
         self.convert_group(h5gr_orig["tensors"])  # convert the arrays
         tensors = self.load(subpath_orig + "tensors")
-        # convert leg labels. In prev_tenpy, the order is guaranteed.
+        # convert leg labels. In old tenpy, the order is guaranteed.
         tensors = [W.iset_leg_labels(['wL', 'wR', 'p', 'p*']) for W in tensors]
         chinfo = tensors[0].legs[0].chinfo
         for W in tensors:
@@ -168,9 +162,8 @@ class Converter(Hdf5Converter):
         # IdL and IdR
         IdL = list(self.load(subpath_orig + "index_identity_left"))
         IdR = list(self.load(subpath_orig + "index_identity_right"))
-        # old tenpy: indexed by bond b right of site b
-        # entry 0 always right of site 0, length of IdL depends on bc
-        # new tenpy: always L+1 entries, 0 left of site 0
+        # new tenpy: bond b left  of site b, always L+1 entries
+        # old tenpy: bond b right of site b, length L+1 for segment bc, others L
         IdL = [None] + IdL  # now entry b is left of site b
         IdR = [None] + IdR
         if bc == 'infinite':
@@ -182,11 +175,13 @@ class Converter(Hdf5Converter):
         else: # segment
             IdL[0] = IdL.pop()
             IdR[0] = IdR.pop()
+        self.save(IdL, subpath_new + "index_identity_left")
+        self.save(IdR, subpath_new + "index_identity_right")
 
         # copy metadata
-        h5gr_new.attrs["L"] = h5gr_orig.attrs["L"]
-        h5gr_new.attrs["max_bond_dimension"] = h5gr_orig.attrs["max_bond_dimension"]
-        h5gr_new.attrs["grouped"] = grouped = h5gr_orig.attrs["grouped"]
+        h5gr_new.attrs["L"] = self.get_attr(h5gr_orig, "L")
+        h5gr_new.attrs["max_bond_dimension"] = self.get_attr(h5gr_orig, "max_bond_dimension")
+        h5gr_new.attrs["grouped"] = self.get_attr(h5gr_orig, "grouped")
         self.save(None, subpath_new + "max_range")  # unknown
 
     mappings[('mps.mpo', 'MPO')] = \
