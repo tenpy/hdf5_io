@@ -18,7 +18,7 @@ datadir_hdf5 = [f for f in datadir_files if f.endswith('.hdf5')]
 def gen_example_data():
     data = {
         'None': None,
-        'scalars': [0, np.int64(1), 2., np.float64(3.), 4.j, 'five'],
+        'scalars': [0, np.int64(1), 2., np.float64(3.), 4.j, 'five', True],
         'arrays': [np.array([6, 66]), np.array([]),
                     np.zeros([])],
         'iterables': [[], [11, 12],
@@ -53,12 +53,13 @@ def assert_equal_data(data_imported, data_expected, max_recursion_depth=10):
             for ki in data_imported.keys():
                 assert_equal_data(data_imported[ki], data_expected[ki], max_recursion_depth - 1)
     elif isinstance(data_expected, (list, tuple)):
+        assert len(data_imported) == len(data_expected)
         if max_recursion_depth > 0:
             for vi, ve in zip(data_imported, data_expected):
                 assert_equal_data(vi, ve, max_recursion_depth - 1)
     elif isinstance(data_expected, np.ndarray):
         np.testing.assert_array_equal(data_imported, data_expected)
-    elif isinstance(data_expected, (int, float, np.int64, np.float64)):
+    elif isinstance(data_expected, (int, float, np.int64, np.float64, bool)):
         assert data_imported == data_expected
     elif isinstance(data_expected, range):
         assert tuple(data_imported) == tuple(data_expected)
