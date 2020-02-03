@@ -19,22 +19,23 @@ prompt_continue() {
 
 THISREPO="$(dirname "$(readlink -f "$0")")"
 TENPYREPO="$1"
+REPOSRCFILE="tenpy/tools/hdf5_io.py"
+REPODOCFILE="doc/intro/input_output.rst"
 
 cd "$TENPYREPO"
-if test -n "$(git status -s)" 
+if test -n "$(git status -s $REPOSRCFILE $REPODOCFILE )" 
 then
 	echo "Erorr: git repository not clean; afraid to overwrite something."
 	exit 1 
 fi
 
-cp "$THISREPO/src/python3/hdf5_io.py" "$TENPYREPO/tenpy/tools/hdf5_io.py"
-cp "$THISREPO/doc/input_output.rst" "$TENPYREPO/doc/intro/input_output.rst"
+cp "$THISREPO/src/python3/hdf5_io.py" "$TENPYREPO/$REPOSRCFILE"
+cp "$THISREPO/doc/input_output.rst" "$TENPYREPO/$REPODOCFILE"
 prompt_continue "Copied files. Continue [y/n]?"
 
-git diff
+git diff $REPOSRCFILE $REPODOCFILE
 
 prompt_continue "git commit these changes [y/n]?"
 
-git add tenpy/tools/io.py
-git add doc/intro/input_output.rst
-git commit -m "Merged files from hdf5_io repository"
+git add $REPOSRCFILE $REPODOCFILE
+git commit -m "Merged files from hdf5_io repository" $REPOSRCFILE $REPODOCFILE
