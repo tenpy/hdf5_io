@@ -13,6 +13,7 @@ import h5py
 import hdf5_io
 from hdf5_io import ATTR_TYPE, ATTR_CLASS, ATTR_MODULE, REPR_HDF5EXPORTABLE, REPR_IGNORED
 import importlib
+import warnings
 
 
 BACKUP_PATH = "/backup_pre_convert"   #: path of (temporary) group inside the file
@@ -144,7 +145,15 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         class_name = self.get_attr(h5gr, ATTR_CLASS)
         mapping = self.mappings.get((module_name, class_name))
         if mapping is None:
-            self.convert_subgroups(h5gr)
+            converted_into = False
+            for (mod_name, cls_name, _) in self.mappings.values():
+                if (mod_name, cls_name) == (module_name, class_name):
+                    converted_into = True
+                    break
+            if not converted_into:
+                warnings.warn("no mapping for class {1!r} in {0!r}, simply convert subgroups"
+                            .format(module_name, class_name))
+                self.convert_subgroups(h5gr)
             return  # nothing else to convert
 
         new_module_name, new_class_name, map_function = mapping
