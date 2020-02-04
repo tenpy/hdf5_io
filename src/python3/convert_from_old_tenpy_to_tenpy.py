@@ -71,9 +71,8 @@ class Converter(Hdf5Converter):
 
     def convert_MPS(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
         L = self.get_attr(h5gr_orig, "L")
-        if h5gr_orig["translate_Q1_data"].attrs[hdf5_io.ATTR_TYPE] != hdf5_io.REPR_NONE:
-            raise ValueError("Can't convert MPS with non-trivial 'translate_Q1_data'")
-
+        if self.get_attr(h5gr_orig["translate_Q1_data"], hdf5_io.ATTR_TYPE) != hdf5_io.REPR_NONE:
+            raise ValueError("TODO: non-trivial 'translate_Q1_data' not supported in new TeNPy")
         # tensors
         self.convert_group(h5gr_orig["tensors"])  # implicitly calls self.convert_array
         tensors = self.load(subpath_orig + "tensors")
@@ -132,18 +131,33 @@ class Converter(Hdf5Converter):
         h5gr_new.attrs["transfermatrix_keep"] = self.get_attr(h5gr_orig, "transfermatrix_keep")
 
 
-    mappings[('mps.mps', 'iMPS')] = \
-        ('tenpy.networks.mps', 'MPS', convert_MPS)
+    mappings[('mps.mps', 'iMPS')] = ('tenpy.networks.mps', 'MPS', convert_MPS)
+
+    def convert_index_identity(self, Id_LR, bc):
+        """Convert `vL`-> `IdL` and `vR`->`IdR`."""
+        # new tenpy: bond b left  of site b, always L+1 entries
+        # old tenpy: bond b right of site b, length L+1 for segment bc, others L
+        Id_LR = [None] + Id_LR  # now entry b is left of site b
+        if bc == 'infinite' or bc == 'periodic':
+            Id_LR[0] = Id_LR[-1]
+        elif bc == 'finite':
+            Id_LR[0] = Id_LR[-1] = 0
+        elif bc == 'segment':
+            Id_LR[0] = Id_LR.pop()
+        else:
+            raise ValueError("don't recognise bc_MPS=" + repr(bc))
+        return Id_LR
 
     def convert_MPO(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
         L = self.get_attr(h5gr_orig, "L")
         if self.get_attr(h5gr_orig["translate_Q1_data"], hdf5_io.ATTR_TYPE) != hdf5_io.REPR_NONE:
-            raise ValueError("Can't convert MPO with non-trivial 'translate_Q1_data'")
+            raise ValueError("TODO: non-trivial 'translate_Q1_data' not supported in new TeNPy")
         # tensors: (implicitly) call above conversion function
         self.convert_group(h5gr_orig["tensors"])  # convert the arrays
         tensors = self.load(subpath_orig + "tensors")
-        # convert leg labels. In old tenpy, the order is guaranteed.
-        tensors = [W.iset_leg_labels(['wL', 'wR', 'p', 'p*']) for W in tensors]
+        # convert leg labels.
+        tensors = [W.itranspose(['w', 'w*', 'p', 'p*']).iset_leg_labels(['wL', 'wR', 'p', 'p*'])
+                   for W in tensors]
         chinfo = tensors[0].legs[0].chinfo
         for W in tensors:
             for leg in W.legs:
@@ -162,19 +176,8 @@ class Converter(Hdf5Converter):
         # IdL and IdR
         IdL = list(self.load(subpath_orig + "index_identity_left"))
         IdR = list(self.load(subpath_orig + "index_identity_right"))
-        # new tenpy: bond b left  of site b, always L+1 entries
-        # old tenpy: bond b right of site b, length L+1 for segment bc, others L
-        IdL = [None] + IdL  # now entry b is left of site b
-        IdR = [None] + IdR
-        if bc == 'infinite':
-            IdL[0] = IdL[-1]
-            IdR[0] = IdR[-1]
-        elif bc == 'finite':
-            IdL[0] = IdR[-1] = 0
-            IdL[0] = IdR[-1] = 0
-        else: # segment
-            IdL[0] = IdL.pop()
-            IdR[0] = IdR.pop()
+        IdL = self.convert_index_identity(IdL, bc)
+        IdR = self.convert_index_identity(IdR, bc)
         self.save(IdL, subpath_new + "index_identity_left")
         self.save(IdR, subpath_new + "index_identity_right")
 
@@ -184,8 +187,102 @@ class Converter(Hdf5Converter):
         h5gr_new.attrs["grouped"] = self.get_attr(h5gr_orig, "grouped")
         self.save(None, subpath_new + "max_range")  # unknown
 
-    mappings[('mps.mpo', 'MPO')] = \
-        ('tenpy.networks.mpo', 'MPO', convert_MPO)
+    mappings[('mps.mpo', 'MPO')] = ('tenpy.networks.mpo', 'MPO', convert_MPO)
+
+    def convert_model(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
+        L = self.get_attr(h5gr_orig, "L")
+        if self.load(subpath_orig + "add_conj"):
+            raise ValueError("TODO: add_conj=True currently not supported in new TenPy")
+        if self.get_attr(h5gr_orig["translate_Q1_data"], hdf5_io.ATTR_TYPE) != hdf5_io.REPR_NONE:
+            raise ValueError("TODO: non-trivial 'translate_Q1_data' not supported in new TeNPy")
+        # convert the npc arrays
+        self.convert_group(h5gr_orig["H_mpo"])
+        H_mpo_tensors = self.load(subpath_orig + "H_mpo")
+        assert H_mpo_tensors is not None
+        # construct sites
+        chinfo = H_mpo_tensors[0].chinfo
+        states = self.load(subpath_orig + "states")
+        self.convert_group(h5gr_orig["onsite_operators"])  # also converts npc Arrays
+        onsite_ops = self.load(subpath_orig + "onsite_operators")
+        self.convert_group(h5gr_orig["bond_operators"])  # also converts npc Arrays
+        h5gr_new["bond_ops"] = h5gr_orig["bond_operators"]  # just copy the bond operators
+        # TODO: so far, there is no well-defined format for bond operators in the new TeNPy.
+
+        # generate sites
+        sites = []
+        for i in range(L):
+            H_mpo_tensors[i].itranspose(['w', 'w*', 'p', 'p*']).iset_leg_labels(
+                ['wL', 'wR', 'p', 'p*'])
+            p_leg = H_mpo_tensors[i].legs[2]
+            p_leg.chinfo = chinfo
+            H_mpo_tensors[i].legs[3].test_contractible(p_leg)
+            H_mpo_tensors[i].legs[3] = p_leg.conj()
+            d = p_leg.ind_len
+            state_labels = [None] * d
+            for name, j in states[i].items():
+                state_labels[j] = name
+            local_site_ops = {}
+            for name, op_list in onsite_ops.items():
+                op = op_list[i].itranspose(['p', 'p*'])
+                op.legs[0].test_equal(p_leg)
+                op.chinfo = chinfo
+                op.legs = [p_leg, p_leg.conj()]
+                local_site_ops[name] = op
+            if 'Id' in local_site_ops:
+                del local_site_ops['Id']
+            site = tenpy.networks.site.Site(p_leg, state_labels, **local_site_ops)
+            sites.append(site)
+
+        # get `data` dictionary with content to be saved as model.__dict__
+        data = {}
+        data['grouped'] = grouped = self.get_attr(h5gr_orig, "grouped")
+        # lat
+        bc_MPS = self.convert_bc(self.load(subpath_orig + "boundary_condition"))
+        bc = [("periodic" if bc_MPS == 'infinite' else "open")]
+        data['lat'] = tenpy.models.lattice.TrivialLattice(sites, bc_MPS=bc_MPS, bc=bc)
+        # H_MPO
+        IdL = self.load(subpath_orig + "index_identity_left")
+        IdR = self.load(subpath_orig + "index_identity_right")
+        IdL = self.convert_index_identity(IdL, bc_MPS)
+        IdR = self.convert_index_identity(IdR, bc_MPS)
+        data["H_MPO"] = tenpy.networks.mpo.MPO(sites, H_mpo_tensors, bc_MPS, IdL, IdR)
+
+        # H_bond
+        if "H" in h5gr_orig:
+            self.convert_group(h5gr_orig["H"])  # convert npc Arrays
+            H_bond = list(self.load(subpath_orig + "H"))
+            # new tenpy: always L entries, entry b is sites (b-1, b), None if not to be used.
+            # old tenpy: always L entries, entry b is sites (b, b+1), for finite: last entry 0.
+            H_bond = [H_bond[-1]] + H_bond[:-1]  # now entry b is sites (b-1, b)
+            if bc_MPS == 'finite':
+                H_bond[0] = None
+            data["H_bond"] = H_bond
+        # save the contents of the model
+        type_repr = self.save_dict_content(data, h5gr_new, subpath_new)
+        h5gr_new.attrs[hdf5_io.ATTR_FORMAT] = type_repr
+
+    for _model in [('models.model', 'model'), # base class
+                   # and derived classes defined in TeNPy
+                   ('models.bhf', 'bhf_model'),
+                   ('models.boson', 'boson_model'),
+                   ('models.boson2d', 'boson2d_model'),
+                   ('models.double_model', 'double_model'),
+                   ('models.dual_ising', 'dual_ising_model'),
+                   ('models.fermions_chain', 'sf_model'),
+                   ('models.fermions_hubbard', 'fh_model'),
+                   ('models.fermions_ladder', 'fermionic_model'),
+                   ('models.height_models', 'height_model'),
+                   ('models.levingu', 'levingu_model'),
+                   ('models.long_range_spin_chain', 'spin_chain_model'),
+                   ('models.majorana_island', 'majorana_island_model'),
+                   ('models.multilayer_qh', 'QH_model'),
+                   ('models.potts', 'potts_model'),
+                   ('models.quantum_hall', 'QH_model'),
+                   ('models.spin_chain', 'spin_chain_model'),
+                   ('models.xxz_tfi', 'xxz_tfi_model'),
+                   ]:
+        mappings[_model] = ('tenpy.models.model', 'MPOModel', convert_model)
+    del _model
 
 
 if __name__ == "__main__":
