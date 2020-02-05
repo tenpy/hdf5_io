@@ -97,7 +97,7 @@ def save(data, filename, mode='w'):
     elif filename.endswith('.hdf5'):
         import h5py
         with h5py.File(filename, mode) as f:
-            save_to_hdf5(f, obj)
+            save_to_hdf5(f, data)
     else:
         raise ValueError("Don't recognise file ending of " + repr(filename))
 
