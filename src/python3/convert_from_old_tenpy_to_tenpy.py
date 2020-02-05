@@ -134,7 +134,7 @@ class Converter(Hdf5Converter):
     mappings[('mps.mps', 'iMPS')] = ('tenpy.networks.mps', 'MPS', convert_MPS)
 
     def convert_index_identity(self, Id_LR, bc):
-        """Convert `vL`-> `IdL` and `vR`->`IdR`."""
+        """Convert `vL`-> `IdL` and `vR`->`IdR` for an MPO."""
         # new tenpy: bond b left  of site b, always L+1 entries
         # old tenpy: bond b right of site b, length L+1 for segment bc, others L
         Id_LR = [None] + Id_LR  # now entry b is left of site b
@@ -254,6 +254,9 @@ class Converter(Hdf5Converter):
             # new tenpy: always L entries, entry b is sites (b-1, b), None if not to be used.
             # old tenpy: always L entries, entry b is sites (b, b+1), for finite: last entry 0.
             H_bond = [H_bond[-1]] + H_bond[:-1]  # now entry b is sites (b-1, b)
+            for H in H_bond:
+                if H is not None:
+                    H.itranspose(['p0', 'p1', 'p0*', 'p1*'])  # same labels
             if bc_MPS == 'finite':
                 H_bond[0] = None
             data["H_bond"] = H_bond
@@ -262,7 +265,7 @@ class Converter(Hdf5Converter):
         h5gr_new.attrs[hdf5_io.ATTR_FORMAT] = type_repr
 
     for _model in [('models.model', 'model'), # base class
-                   # and derived classes defined in TeNPy
+                   # and derived classes defined in tenpy
                    ('models.bhf', 'bhf_model'),
                    ('models.boson', 'boson_model'),
                    ('models.boson2d', 'boson2d_model'),
