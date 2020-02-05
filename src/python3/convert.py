@@ -63,8 +63,10 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         with the old hdf5 group `h5gr_old` moved into :attr:`backup_gr`,  the new group `h5gr_new`
         to take the the converted data, and `subpath_orig` and `subpath_new` just being the names
         of the group with a ``'/'`` in the end to allow easy loading/saving of group members.
-        The attributes for type, class and module set accordingly to `h5gr_new`;
+        The attributes for type, class and module are set accordingly to `h5gr_new`;
         the `map_function` only needs to convert the data.
+        You can use :meth:`load` and :meth:`save` for the conversion, but make (object) copies if
+        you want to modify an object, i.e., don't modify the objects "in place".
     backup_gr : :class:`Group`
         Hdf5 group into which groups are moved for conversion.
     """

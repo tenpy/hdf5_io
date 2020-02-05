@@ -73,7 +73,7 @@ class Converter(Hdf5Converter):
         # tensors
         tensors = self.load(subpath_orig + "tensors")
         # convert leg labels and order
-        tensors = [B.itranspose(['p', 'vL', 'vR']).iset_leg_labels(['p', 'b', 'b*'])
+        tensors = [B.transpose(['p', 'vL', 'vR']).iset_leg_labels(['p', 'b', 'b*'])
                    for B in tensors]
         self.save(tensors, subpath_new + "tensors")
         self.convert_group(h5gr_new["tensors"])  # implicitly calls self.convert_array
@@ -135,7 +135,7 @@ class Converter(Hdf5Converter):
         # tensors
         tensors = self.load(subpath_orig + "tensors")
         # convert leg labels and order
-        tensors = [B.itranspose(['wL', 'wR', 'p', 'p*']).iset_leg_labels(['w', 'w*', 'p', 'p*'])
+        tensors = [B.transpose(['wL', 'wR', 'p', 'p*']).iset_leg_labels(['w', 'w*', 'p', 'p*'])
                    for B in tensors]
         self.save(tensors, subpath_new + "tensors")
         self.convert_group(h5gr_new["tensors"])  # implicitly calls self.convert_array
@@ -179,10 +179,10 @@ class Converter(Hdf5Converter):
             H_bond =  H_bond[1:] + [H_bond[0]]  # now entry b is sites (b, b+1)
             if bc == 'finite':
                 p0 = H_bond[-2].get_leg('p1')
+                p1 = H_bond[0].get_leg('p0')
                 H_bond[-1] = npc.zeros([p0, p1, p0.conj(), p1.conj()],
-                                       lables=['p0', 'p1', 'p0*', 'p1*'])
-            for H in H_bond:
-                H.itranspose(['p0', 'p1', 'p0*', 'p1*'])  # same labels
+                                       labels=['p0', 'p1', 'p0*', 'p1*'])
+            H_bond = [H.transpose(['p0', 'p1', 'p0*', 'p1*']) for H in H_bond]
             self.save(H_bond, subpath_new + "H")
             self.convert_group(h5gr_new["H"])  # convert npc Arrays
 

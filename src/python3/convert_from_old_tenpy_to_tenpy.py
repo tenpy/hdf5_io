@@ -77,7 +77,7 @@ class Converter(Hdf5Converter):
         tensors = self.convert_group(h5gr_orig["tensors"])  # implicitly calls self.convert_array
         tensors = self.load(tensors.name)
         # convert leg labels and order
-        tensors = [B.iset_leg_labels(['p', 'vL', 'vR']).itranspose(['vL', 'p', 'vR'])
+        tensors = [B.transpose(['b', 'p', 'b*']).iset_leg_labels(['vL', 'p', 'vR'])
                    for B in tensors]
         chinfo = tensors[0].legs[0].chinfo
         for B in tensors:
@@ -156,7 +156,7 @@ class Converter(Hdf5Converter):
         tensors = self.convert_group(h5gr_orig["tensors"])  # convert the arrays
         tensors = self.load(tensors.name)
         # convert leg labels.
-        tensors = [W.itranspose(['w', 'w*', 'p', 'p*']).iset_leg_labels(['wL', 'wR', 'p', 'p*'])
+        tensors = [W.transpose(['w', 'w*', 'p', 'p*']).iset_leg_labels(['wL', 'wR', 'p', 'p*'])
                    for W in tensors]
         chinfo = tensors[0].legs[0].chinfo
         for W in tensors:
@@ -211,19 +211,19 @@ class Converter(Hdf5Converter):
         # generate sites
         sites = []
         for i in range(L):
-            H_mpo_tensors[i].itranspose(['w', 'w*', 'p', 'p*']).iset_leg_labels(
-                ['wL', 'wR', 'p', 'p*'])
-            p_leg = H_mpo_tensors[i].legs[2]
+            H_mpo_tensors[i] = Hi = H_mpo_tensors[i].transpose(['w', 'w*', 'p', 'p*'])  # copy
+            Hi.iset_leg_labels(['wL', 'wR', 'p', 'p*'])
+            p_leg = Hi.legs[2]
             p_leg.chinfo = chinfo
-            H_mpo_tensors[i].legs[3].test_contractible(p_leg)
-            H_mpo_tensors[i].legs[3] = p_leg.conj()
+            Hi.legs[3].test_contractible(p_leg)
+            Hi.legs[3] = p_leg.conj()
             d = p_leg.ind_len
             state_labels = [None] * d
             for name, j in states[i].items():
                 state_labels[j] = name
             local_site_ops = {}
             for name, op_list in onsite_ops.items():
-                op = op_list[i].itranspose(['p', 'p*'])
+                op = op_list[i].transpose(['p', 'p*'])
                 op.legs[0].test_equal(p_leg)
                 op.chinfo = chinfo
                 op.legs = [p_leg, p_leg.conj()]
@@ -254,9 +254,9 @@ class Converter(Hdf5Converter):
             # new tenpy: always L entries, entry b is sites (b-1, b), None if not to be used.
             # old tenpy: always L entries, entry b is sites (b, b+1), for finite: last entry 0.
             H_bond = [H_bond[-1]] + H_bond[:-1]  # now entry b is sites (b-1, b)
-            for H in H_bond:
+            for i, H in enumerate(H_bond):
                 if H is not None:
-                    H.itranspose(['p0', 'p1', 'p0*', 'p1*'])  # same labels
+                    H_bond[i] = H.transpose(['p0', 'p1', 'p0*', 'p1*'])  # copy, same labels
             if bc_MPS == 'finite':
                 H_bond[0] = None
             data["H_bond"] = H_bond
