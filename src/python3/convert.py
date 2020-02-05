@@ -52,7 +52,7 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
     memo_convert : dict
         A dictionary to remember all the HDF5 groups which we already converted.
         The dictionary key is the h5py group- or dataset ``id``;
-        the value is the hdf5 group itself. See :meth:`memorize_convert`.
+        the value is the converted hdf5 group. See :meth:`memorize_convert`.
     mappings : dict
         Dictionary keys are tuples ``(modulename, classname)`` defining objects of which classes
         should be converted, dictionary values are corresponding tuples
@@ -87,11 +87,10 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         else:
             self.backup_gr = backup_gr = self.h5group[BACKUP_PATH]
             for subgr in backup_gr.values():
-                self.memorize_convert(subgr)
-        self.memorize_convert(self.backup_gr)  # exclude backup path for conversion
+                self.memorize_convert(subgr, subgr)
+        self.memorize_convert(self.backup_gr, self.backup_gr)  # exclude conversion
 
-
-    def memorize_convert(self, h5gr):
+    def memorize_convert(self, h5gr, h5gr_converted):
         """Store groups already converted in the :attr:`memo_convert`.
 
         Necessary to avoid loops in the recursion for cyclic references, and to avoid converting
@@ -101,8 +100,10 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         ----------
         h5gr : :class:`Group` | :class:`Dataset`
             The h5py group or dataset before conversion.
+        h5gr_converted : :class:`Group` | :class:`Dataset`
+            The h5py group or dataset after conversion.
         """
-        self.memo_convert[h5gr.id] = h5gr
+        self.memo_convert[h5gr.id] = h5gr_converted
 
     def convert_file(self):
         """Convert all groups of the file."""
@@ -130,17 +131,22 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         ----------
         h5gr : :class:`Group` | :class:`Dataset`
             The h5py group or dataset to be converted.
+
+        Returns
+        -------
+        h5gr_new : :class:`Group` | :class:`Dataset`
+            The converted h5py group or dataset.
         """
         in_memo = self.memo_convert.get(h5gr.id)
         if in_memo is not None:
-            return  # already converted
-        self.memorize_convert(h5gr)
+            return in_memo  # already converted
+        self.memorize_convert(h5gr, h5gr)  # avoid endless recursion for cyclic references
 
         type_ = h5gr.attrs.get(ATTR_TYPE)
         if type_ != REPR_HDF5EXPORTABLE:
             if type_ != REPR_IGNORED:
                 self.convert_subgroups(h5gr)
-            return  # nothing to convert
+            return h5gr  # nothing to convert
         module_name = self.get_attr(h5gr, ATTR_MODULE)
         class_name = self.get_attr(h5gr, ATTR_CLASS)
         mapping = self.mappings.get((module_name, class_name))
@@ -152,9 +158,9 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
                     break
             if not converted_into:
                 warnings.warn("no mapping for class {1!r} in {0!r}, simply convert subgroups"
-                            .format(module_name, class_name))
+                              .format(module_name, class_name))
                 self.convert_subgroups(h5gr)
-            return  # nothing else to convert
+            return h5gr  # nothing else to convert
 
         new_module_name, new_class_name, map_function = mapping
         orig_path = h5gr.name
@@ -176,7 +182,9 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         h5gr_new.attrs[ATTR_CLASS] = new_class_name
         subpath = h5gr.name + '/'
         subpath_new = h5gr_new.name + '/'
+        self.memorize_convert(h5gr, h5gr_new)  # update memo
         map_function(self, h5gr, subpath, h5gr_new, subpath_new)  # convert data
+        return h5gr_new
 
     def convert_subgroups(self, h5gr):
         """Call :meth:`convert_group` for any subgroups of `h5gr`."""

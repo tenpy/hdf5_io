@@ -74,8 +74,8 @@ class Converter(Hdf5Converter):
         if self.get_attr(h5gr_orig["translate_Q1_data"], hdf5_io.ATTR_TYPE) != hdf5_io.REPR_NONE:
             raise ValueError("TODO: non-trivial 'translate_Q1_data' not supported in new TeNPy")
         # tensors
-        self.convert_group(h5gr_orig["tensors"])  # implicitly calls self.convert_array
-        tensors = self.load(subpath_orig + "tensors")
+        tensors = self.convert_group(h5gr_orig["tensors"])  # implicitly calls self.convert_array
+        tensors = self.load(tensors.name)
         # convert leg labels and order
         tensors = [B.iset_leg_labels(['p', 'vL', 'vR']).itranspose(['vL', 'p', 'vR'])
                    for B in tensors]
@@ -153,8 +153,8 @@ class Converter(Hdf5Converter):
         if self.get_attr(h5gr_orig["translate_Q1_data"], hdf5_io.ATTR_TYPE) != hdf5_io.REPR_NONE:
             raise ValueError("TODO: non-trivial 'translate_Q1_data' not supported in new TeNPy")
         # tensors: (implicitly) call above conversion function
-        self.convert_group(h5gr_orig["tensors"])  # convert the arrays
-        tensors = self.load(subpath_orig + "tensors")
+        tensors = self.convert_group(h5gr_orig["tensors"])  # convert the arrays
+        tensors = self.load(tensors.name)
         # convert leg labels.
         tensors = [W.itranspose(['w', 'w*', 'p', 'p*']).iset_leg_labels(['wL', 'wR', 'p', 'p*'])
                    for W in tensors]
@@ -196,16 +196,16 @@ class Converter(Hdf5Converter):
         if self.get_attr(h5gr_orig["translate_Q1_data"], hdf5_io.ATTR_TYPE) != hdf5_io.REPR_NONE:
             raise ValueError("TODO: non-trivial 'translate_Q1_data' not supported in new TeNPy")
         # convert the npc arrays
-        self.convert_group(h5gr_orig["H_mpo"])
-        H_mpo_tensors = self.load(subpath_orig + "H_mpo")
+        H_mpo_tensors = self.convert_group(h5gr_orig["H_mpo"])
+        H_mpo_tensors = self.load(H_mpo_tensors.name)
         assert H_mpo_tensors is not None
         # construct sites
         chinfo = H_mpo_tensors[0].chinfo
         states = self.load(subpath_orig + "states")
-        self.convert_group(h5gr_orig["onsite_operators"])  # also converts npc Arrays
-        onsite_ops = self.load(subpath_orig + "onsite_operators")
-        self.convert_group(h5gr_orig["bond_operators"])  # also converts npc Arrays
-        h5gr_new["bond_ops"] = h5gr_orig["bond_operators"]  # just copy the bond operators
+        onsite_ops = self.convert_group(h5gr_orig["onsite_operators"])  # converts npc Arrays
+        onsite_ops = self.load(onsite_ops.name)
+        bond_ops = self.convert_group(h5gr_orig["bond_operators"])  # converts npc Arrays
+        h5gr_new["bond_ops"] = bond_ops  # just hardcopy the hdf5 group
         # TODO: so far, there is no well-defined format for bond operators in the new TeNPy.
 
         # generate sites
@@ -249,8 +249,8 @@ class Converter(Hdf5Converter):
 
         # H_bond
         if "H" in h5gr_orig:
-            self.convert_group(h5gr_orig["H"])  # convert npc Arrays
-            H_bond = list(self.load(subpath_orig + "H"))
+            H_bond = self.convert_group(h5gr_orig["H"])  # convert npc Arrays
+            H_bond = list(self.load(H_bond.name))
             # new tenpy: always L entries, entry b is sites (b-1, b), None if not to be used.
             # old tenpy: always L entries, entry b is sites (b, b+1), for finite: last entry 0.
             H_bond = [H_bond[-1]] + H_bond[:-1]  # now entry b is sites (b-1, b)
