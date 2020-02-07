@@ -114,6 +114,10 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
                 print("="*80)
             print("converting file", self.h5group.filename)
 
+        # set top-level group "/" of the file to be a dictionary, if not specified before.
+        if not hdf5_io.ATTR_TYPE in self.h5group.attrs:
+            self.h5group.attrs[hdf5_io.ATTR_TYPE] = hdf5_io.REPR_DICT_SIMPLE
+
         self.convert_group(self.h5group)  # recursive
 
         # now (once that everything worked, not in __del__) we can delete the backup
