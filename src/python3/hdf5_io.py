@@ -138,7 +138,7 @@ def load(filename):
     elif filename.endswith('.pklz'):
         with gzip.open(filename, mode) as f:
             data = pickle.load(f, 'rb')
-    elif filename.endswith('.hdf5'):
+    elif filename.endswith('.hdf5') or filename.endswith('.h5'):
         import h5py
         with h5py.File(filename, 'r') as f:
             data = load_from_hdf5(f)
@@ -735,7 +735,8 @@ class Hdf5Loader:
     def find_class(module, classname):
         """Get the class of the qualified `classname` in a given python `module`.
 
-        Imports the module."""
+        Imports the module.
+        """
         mod = importlib.import_module(module)
         cls = mod
         for subpath in classname.split('.'):
