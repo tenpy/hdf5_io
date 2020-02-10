@@ -23,7 +23,8 @@ ATTR_ORIG_PATH = "original_path"  #: Attribute name for path before moving a gro
 # for conversion
 
 
-__all__ = ['BACKUP_PATH', 'convert_file', 'parse_args', 'main']
+__all__ = ['BACKUP_PATH', 'ATTR_ORIG_PATH', 'HDF5Converter', 'parse_args', 'find_converter',
+           'main']
 
 
 class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
@@ -149,6 +150,11 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         self.memorize_convert(h5gr, h5gr)  # avoid endless recursion for cyclic references
 
         type_ = h5gr.attrs.get(ATTR_TYPE)
+        if type_ is None:  # no type_ defined
+            warnings.warn("Ignore group with no type set.")
+            if self.verbose > 1:
+                print("dataset {0!r} has no attribute {1!r} defined".format(h5gr.name, ATTR_TYPE))
+            return h5gr  # nothing to convert
         if type_ != REPR_HDF5EXPORTABLE:
             if type_ != REPR_IGNORED:
                 self.convert_subgroups(h5gr)
@@ -196,8 +202,7 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         """Call :meth:`convert_group` for any subgroups of `h5gr`."""
         if not isinstance(h5gr, h5py.Group):
             return  # nothing to do, in particular for h5py.Dataset
-        subgroups = list(h5gr.values())
-        for subgr in subgroups:
+        for subgr in list(h5gr.values()):
             self.convert_group(subgr)
         # done
 
@@ -293,7 +298,7 @@ def find_converter(from_format, to_format):
         mod = importlib.import_module(module_name)
     except ImportError:
         raise ValueError("Conversion for these formats not possible:\n"
-                         "Can't find module {0!r}".format(module_name))
+                         "Can't find module {0!r}".format(module_name)) from None
     return mod.Converter
 
 
@@ -312,6 +317,7 @@ def main(args):
         else:
             conv.convert_file()
     # done
+
 
 if __name__ == "__main__":
     args = parse_args()
