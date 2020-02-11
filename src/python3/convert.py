@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Convert the format of hdf5 files.
 
+.. note ::
+    This module is maintained in the repository https://github.com/tenpy/hdf5_io.git
+
 Specify from which format into which format you want to convert with the ``--from-format``
 and ``--to-format`` command line arguments. We try to load the corresponding conversion
 from the file ``convert_from_{FROM_FORMAT}_to_{TO_FORMAT}.py``.
@@ -55,19 +58,20 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         The dictionary key is the h5py group- or dataset ``id``;
         the value is the converted hdf5 group. See :meth:`memorize_convert`.
     mappings : dict
-        Dictionary keys are tuples ``(modulename, classname)`` defining objects of which classes
-        should be converted, dictionary values are corresponding tuples
-        ``(modulename, classname, map_function)`` defining into which class they should be
-        converted, with the `map_function` performing the data
-        conversion. The `map_function` gets called by :meth:`convert_group` as
+        The structure of the dictionary is ``{convert_from : (convert_to, map_function)}``.
+        Here, `convert_from` and `convert_to` define objects of which types/classes should be
+        converted into which types/classes. Both of them can be either a single string,
+        which just stands for the content of the ``'type'`` attribute,
+        or a tuple ``(modulename, classname)`` for class instances with the
+        ``'type'`` attribute set to ``'instance'``.
+        The `map_function` gets called by :meth:`convert_group` as
         ``map_function(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new)``
         with the old hdf5 group `h5gr_old` moved into :attr:`backup_gr`,  the new group `h5gr_new`
         to take the the converted data, and `subpath_orig` and `subpath_new` just being the names
         of the group with a ``'/'`` in the end to allow easy loading/saving of group members.
-        The attributes for type, class and module are set accordingly to `h5gr_new`;
-        the `map_function` only needs to convert the data.
-        You can use :meth:`load` and :meth:`save` for the conversion, but make (object) copies if
-        you want to modify an object, i.e., don't modify the objects "in place".
+        The attributes for type, class and module are set to `h5gr_new` according to `convert_to`;
+        the `map_function` only needs to convert the data. It can use :meth:`load` and :meth:`save`
+        for the conversion, but should make copies before changing loaded objects.
     backup_gr : :class:`Group`
         Hdf5 group into which groups are moved for conversion.
     """
@@ -155,26 +159,20 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
             if self.verbose > 1:
                 print("dataset {0!r} has no attribute {1!r} defined".format(h5gr.name, ATTR_TYPE))
             return h5gr  # nothing to convert
-        if type_ != REPR_HDF5EXPORTABLE:
+        if type_ == REPR_HDF5EXPORTABLE:
+            module_name = self.get_attr(h5gr, ATTR_MODULE)
+            class_name = self.get_attr(h5gr, ATTR_CLASS)
+            convert_from = (module_name, class_name)
+            mapping = self.mappings.get(convert_from)
+        else:
+            convert_from = type_
+            mapping = self.mappings.get(convert_from)
+        if mapping is None:
+            # no mapping defined, so we simply convert subgroups
             if type_ != REPR_IGNORED:
                 self.convert_subgroups(h5gr)
             return h5gr  # nothing to convert
-        module_name = self.get_attr(h5gr, ATTR_MODULE)
-        class_name = self.get_attr(h5gr, ATTR_CLASS)
-        mapping = self.mappings.get((module_name, class_name))
-        if mapping is None:
-            converted_into = False
-            for (mod_name, cls_name, _) in self.mappings.values():
-                if (mod_name, cls_name) == (module_name, class_name):
-                    converted_into = True
-                    break
-            if not converted_into:
-                warnings.warn("no mapping for class {1!r} in {0!r}, simply convert subgroups"
-                              .format(module_name, class_name))
-                self.convert_subgroups(h5gr)
-            return h5gr  # nothing else to convert
-
-        new_module_name, new_class_name, map_function = mapping
+        convert_to, map_function = mapping
         orig_path = h5gr.name
         counter = len(self.backup_gr)
         moved_path =  '/'.join([BACKUP_PATH, str(counter)])
@@ -183,15 +181,19 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
             moved_path = '/'.join([BACKUP_PATH, str(counter)])
         if self.verbose > 1:
             print("converting group {0!r} from {1!s} to {2!s}, backup {3!s}"
-                  .format(h5gr.name, class_name, new_class_name, moved_path))
+                  .format(h5gr.name, convert_from, convert_to, moved_path))
         elif self.verbose:
             print("converting group", h5gr.name)
         self.h5group.move(orig_path, moved_path)  # first move to backup
         h5gr.attrs[ATTR_ORIG_PATH] = orig_path
         h5gr_new, subpath = self.create_group_for_obj(orig_path, h5gr)  # new group for the data
-        h5gr_new.attrs[ATTR_TYPE] = REPR_HDF5EXPORTABLE
-        h5gr_new.attrs[ATTR_MODULE] = new_module_name
-        h5gr_new.attrs[ATTR_CLASS] = new_class_name
+        if isinstance(convert_to, tuple):
+            new_module_name, new_class_name = convert_to
+            h5gr_new.attrs[ATTR_TYPE] = REPR_HDF5EXPORTABLE
+            h5gr_new.attrs[ATTR_MODULE] = new_module_name
+            h5gr_new.attrs[ATTR_CLASS] = new_class_name
+        else:
+            h5gr_new.attrs[ATTR_TYPE] = convert_to
         subpath = h5gr.name + '/'
         subpath_new = h5gr_new.name + '/'
         self.memorize_convert(h5gr, h5gr_new)  # update memo
@@ -249,11 +251,11 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
     def print_conversions(cls):
         """List from which class into which class conversions are done."""
         print(cls.__doc__)
-        line = "{0:40}.{1:20} -> {2:40}.{3:20}"
-        print(line.format("from_module", "class", "into_module", "into_class"))
+        line = "{0!r:60} -> {1!r:60}"
+        print(line.format("convert from type or (module, class)", "into type or (module, class)"))
         print("="*120)
-        for from_, to_ in cls.mappings.items():
-            print(line.format(from_[0], from_[1], to_[0], to_[1]))
+        for from_, (to_, _) in cls.mappings.items():
+            print(line.format(from_, to_))
 
 
 def parse_args(converter_cls=None):

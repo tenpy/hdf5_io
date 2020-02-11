@@ -15,7 +15,7 @@ class Converter(Hdf5Converter):
 
     mappings = {}
     mappings[('tenpy.tools.hdf5_io', 'Hdf5Exportable')] = \
-        ('tools.hdf5_io', 'Hdf5Exportable', Hdf5Converter.convert_Hdf5Exportable)
+        (('tools.hdf5_io', 'Hdf5Exportable'), Hdf5Converter.convert_Hdf5Exportable)
 
     def convert_array(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
         # copy (hardlinks avoid copies)
@@ -55,7 +55,7 @@ class Converter(Hdf5Converter):
         self.save(labels_new, subpath_new + "labels")
 
     mappings[('tenpy.linalg.np_conserved', 'Array')] = \
-        ('algorithms.linalg.np_conserved', 'array', convert_array)
+        (('algorithms.linalg.np_conserved', 'array'), convert_array)
 
     def convert_bc(self, bc):
         """MPS/MPO boundary conditions."""
@@ -113,7 +113,7 @@ class Converter(Hdf5Converter):
         self.save(None, subpath_new + "translate_Q1_data")
 
     mappings[('tenpy.networks.mps', 'MPS')] = \
-        ('mps.mps', 'iMPS', convert_MPS)
+        (('mps.mps', 'iMPS'), convert_MPS)
 
     def convert_index_identity(self, Id_LR, bc):
         """Convert  `IdL`->`vL`and `IdR`->`vR` for an MPO."""
@@ -161,7 +161,7 @@ class Converter(Hdf5Converter):
         self.save(None, subpath_new + "translate_Q1_data")
 
     mappings[('tenpy.networks.mpo', 'MPO')] = \
-        ('mps.mpo', 'MPO', convert_MPO)
+        (('mps.mpo', 'MPO'), convert_MPO)
 
     def convert_model(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
         assert h5gr_orig.attrs[hdf5_io.ATTR_FORMAT] == hdf5_io.REPR_DICT_SIMPLE
@@ -237,7 +237,7 @@ class Converter(Hdf5Converter):
                    ('tenpy.models.xxz_chain', 'XXZChain'),
                    ('tenpy.models.xxz_chain', 'XXZChain2'),
                    ]:
-        mappings[_model] = ('models.model', 'model', convert_model)
+        mappings[_model] = (('models.model', 'model'), convert_model)
     del _model
 
 

@@ -15,7 +15,7 @@ class Converter(Hdf5Converter):
 
     mappings = {}
     mappings[('tools.hdf5_io', 'Hdf5Exportable')] = \
-        ('tenpy.tools.hdf5_io', 'Hdf5Exportable', Hdf5Converter.convert_Hdf5Exportable)
+        (('tenpy.tools.hdf5_io', 'Hdf5Exportable'), Hdf5Converter.convert_Hdf5Exportable)
 
     def convert_array(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
         # copy (hardlinks avoid copies)
@@ -57,7 +57,7 @@ class Converter(Hdf5Converter):
         self.save(labels_new, subpath_new + "labels")
 
     mappings[('algorithms.linalg.np_conserved', 'array')] = \
-        ('tenpy.linalg.np_conserved', 'Array', convert_array)
+        (('tenpy.linalg.np_conserved', 'Array'), convert_array)
 
     def convert_bc(self, bc):
         """MPS/MPO boundary conditions."""
@@ -131,7 +131,7 @@ class Converter(Hdf5Converter):
         h5gr_new.attrs["transfermatrix_keep"] = self.get_attr(h5gr_orig, "transfermatrix_keep")
 
 
-    mappings[('mps.mps', 'iMPS')] = ('tenpy.networks.mps', 'MPS', convert_MPS)
+    mappings[('mps.mps', 'iMPS')] = (('tenpy.networks.mps', 'MPS'), convert_MPS)
 
     def convert_index_identity(self, Id_LR, bc):
         """Convert `vL`-> `IdL` and `vR`->`IdR` for an MPO."""
@@ -187,7 +187,7 @@ class Converter(Hdf5Converter):
         h5gr_new.attrs["grouped"] = self.get_attr(h5gr_orig, "grouped")
         self.save(None, subpath_new + "max_range")  # unknown
 
-    mappings[('mps.mpo', 'MPO')] = ('tenpy.networks.mpo', 'MPO', convert_MPO)
+    mappings[('mps.mpo', 'MPO')] = (('tenpy.networks.mpo', 'MPO'), convert_MPO)
 
     def convert_model(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
         L = self.get_attr(h5gr_orig, "L")
@@ -284,7 +284,7 @@ class Converter(Hdf5Converter):
                    ('models.spin_chain', 'spin_chain_model'),
                    ('models.xxz_tfi', 'xxz_tfi_model'),
                    ]:
-        mappings[_model] = ('tenpy.models.model', 'MPOModel', convert_model)
+        mappings[_model] = (('tenpy.models.model', 'MPOModel'), convert_model)
     del _model
 
 
