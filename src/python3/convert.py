@@ -148,6 +148,8 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         h5gr_new : :class:`Group` | :class:`Dataset`
             The converted h5py group or dataset.
         """
+        if self.verbose > 4:
+            print('called convert_group for', repr(h5gr.name))
         in_memo = self.memo_convert.get(h5gr.id)
         if in_memo is not None:
             return in_memo  # already converted
@@ -159,34 +161,32 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
             if self.verbose > 1:
                 print("dataset {0!r} has no attribute {1!r} defined".format(h5gr.name, ATTR_TYPE))
             return h5gr  # nothing to convert
+        if isinstance(type_, bytes):
+            type_ = type_.decode()
         if type_ == REPR_HDF5EXPORTABLE:
             module_name = self.get_attr(h5gr, ATTR_MODULE)
             class_name = self.get_attr(h5gr, ATTR_CLASS)
             convert_from = (module_name, class_name)
             mapping = self.mappings.get(convert_from)
+        elif type_ == REPR_IGNORED:
+            return h5gr  # nothing to do
         else:
             convert_from = type_
             mapping = self.mappings.get(convert_from)
         if mapping is None:
             # no mapping defined, so we simply convert subgroups
-            if type_ != REPR_IGNORED:
-                self.convert_subgroups(h5gr)
+            if self.verbose > 3:
+                print("no mapping for dataset {0!r} from {1!r}".format(h5gr.name, convert_from))
+            self.convert_subgroups(h5gr)
             return h5gr  # nothing to convert
         convert_to, map_function = mapping
-        orig_path = h5gr.name
-        counter = len(self.backup_gr)
-        moved_path =  '/'.join([BACKUP_PATH, str(counter)])
-        while moved_path in h5gr:
-            counter += 1
-            moved_path = '/'.join([BACKUP_PATH, str(counter)])
+        # move to backup_gr and create new group
+        h5gr_orig, subpath_orig, h5gr_new, subpath_new = self.move_backup(h5gr)
         if self.verbose > 1:
             print("converting group {0!r} from {1!s} to {2!s}, backup {3!s}"
-                  .format(h5gr.name, convert_from, convert_to, moved_path))
+                  .format(h5gr.name, convert_from, convert_to, h5gr_orig.name))
         elif self.verbose:
             print("converting group", h5gr.name)
-        self.h5group.move(orig_path, moved_path)  # first move to backup
-        h5gr.attrs[ATTR_ORIG_PATH] = orig_path
-        h5gr_new, subpath = self.create_group_for_obj(orig_path, h5gr)  # new group for the data
         if isinstance(convert_to, tuple):
             new_module_name, new_class_name = convert_to
             h5gr_new.attrs[ATTR_TYPE] = REPR_HDF5EXPORTABLE
@@ -194,10 +194,8 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
             h5gr_new.attrs[ATTR_CLASS] = new_class_name
         else:
             h5gr_new.attrs[ATTR_TYPE] = convert_to
-        subpath = h5gr.name + '/'
-        subpath_new = h5gr_new.name + '/'
         self.memorize_convert(h5gr, h5gr_new)  # update memo
-        map_function(self, h5gr, subpath, h5gr_new, subpath_new)  # convert data
+        map_function(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new)  # convert data
         return h5gr_new
 
     def convert_subgroups(self, h5gr):
@@ -207,6 +205,37 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         for subgr in list(h5gr.values()):
             self.convert_group(subgr)
         # done
+
+    def move_backup(self, h5gr):
+        """Move `h5gr` into :attr:`backup` group."""
+        orig_path = h5gr.name
+        backup_gr = self.backup_gr
+        counter = len(backup_gr)
+        moved_path =  '/'.join([backup_gr.name, str(counter)])
+        while moved_path in h5gr:
+            counter += 1
+            moved_path = '/'.join([backup_gr.name, str(counter)])
+        if orig_path != '/':
+            self.h5group.move(orig_path, moved_path)  # move to backup
+            h5gr_orig = h5gr # now points to the moved group in the backup
+            subpath_orig = h5gr_orig.name + '/'
+            h5gr.attrs[ATTR_ORIG_PATH] = orig_path
+        else: # special case of '/' group: can't move it!
+            # move subgroups of '/' to backup (except the backup group)
+            backup_gr_top = backup_gr.name.split('/')[1]
+            h5gr_orig = backup_gr.create_group(moved_path)
+            for subgr_name in h5gr:
+                if subgr_name != backup_gr_top:
+                    self.h5group.move('/' + subgr_name, '/'.join([backup_gr.name, subgr_name]))
+            # move attributes from h5gr to h5gr_orig
+            for attr in list(h5gr.attrs.keys()):
+                h5gr_orig.attrs[attr] = h5gr.attrs[attr]
+                del h5gr.attrs[attr]
+            h5gr_orig.attrs[ATTR_ORIG_PATH] = orig_path
+            # self.create_group_for_obj() handles the case ``orig_path == '/'`` correctly
+        h5gr_new, subpath_new = self.create_group_for_obj(orig_path, h5gr)  # make new group
+        return h5gr_orig, subpath_orig, h5gr_new, subpath_new
+
 
     def recover_from_backup(self):
         """(Try to) recover the backup from :attr:`backup_gr`."""
@@ -221,6 +250,28 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
             orig_path = gr.attrs[ATTR_ORIG_PATH]
             if self.verbose:
                 print("recover original {0!r} from group {1!r}".format(orig_path, name))
+            if orig_path == "/":
+                # special case: "move" the group content to root
+                backup_gr_top = backup_gr.name.split('/')[1]
+                root_gr = h5file['/']
+                # first clean up root_gr
+                for subgr_name in list(root_gr.keys()):  # delete everything but the backup_gr
+                    if subgr_name != backup_gr_top:
+                        del root_gr[subgr_name]
+                for attr in root_gr.attrs:
+                    del root_gr.attrs[attr]
+                # move groups from the backup `gr`
+                for subgr_name in gr:
+                    if subgr_name == backup_gr_top:
+                        raise ValueError("trying to recover the backup group itself!?!")
+                    gr.move(subgr_name, '/' + subgr_name)
+                # copy attributes
+                for attr in list(gr.attrs.keys()):
+                    if attr != ATTR_ORIG_PATH:
+                        h5gr_orig.attrs[attr] = h5gr.attrs[attr]
+                # remove the `gr`
+                del root_gr[gr.name]
+                continue
             if orig_path not in h5file:
                 warnings.warn("Expected a converted group under " + orig_path)
             else:
@@ -269,8 +320,10 @@ def parse_args(converter_cls=None):
     parser.add_argument('-r',
                         '--recover',
                         action="store_true",
-                        help="Restore the groups from the backup under {0!r} "
-                        "instead of converting something".format(BACKUP_PATH))
+                        help="(Try to) restore the groups from the backup under {0!r} "
+                        "instead of converting something. "
+                        "Make a backup of the whole file before attempting this!"
+                        "".format(BACKUP_PATH))
     parser.add_argument('-l',
                         '--list-only',
                         action="store_true",
