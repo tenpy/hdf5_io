@@ -19,13 +19,11 @@ def gen_example_data():
     data = {
         'None': None,
         'scalars': [0, np.int64(1), 2., np.float64(3.), 4.j, 'five', True],
-        'arrays': [np.array([6, 66]), np.array([]),
-                    np.zeros([])],
+        'arrays': [np.array([6, 66]), np.array([]), np.zeros([])],
         'iterables': [[], [11, 12],
-                        tuple([]),
-                        tuple([1, 2, 3]),
-                        set([]),
-                        set([1, 2, 3])],
+                      tuple([]),
+                      tuple([1, 2, 3]),
+                      set([]), set([1, 2, 3])],
         'recursive': [0, None, 2, [3, None, 5]],
         'dict_complicated': {
             0: 1,

@@ -73,8 +73,9 @@ class Converter(Hdf5Converter):
         # tensors
         tensors = self.load(subpath_orig + "tensors")
         # convert leg labels and order
-        tensors = [B.transpose(['p', 'vL', 'vR']).iset_leg_labels(['p', 'b', 'b*'])
-                   for B in tensors]
+        tensors = [
+            B.transpose(['p', 'vL', 'vR']).iset_leg_labels(['p', 'b', 'b*']) for B in tensors
+        ]
         self.save(tensors, subpath_new + "tensors")
         self.convert_group(h5gr_new["tensors"])  # implicitly calls self.convert_array
 
@@ -103,8 +104,7 @@ class Converter(Hdf5Converter):
 
         h5gr_new.attrs["grouped"] = grouped = self.get_attr(h5gr_orig, "grouped")
         if grouped > 1:
-            warnings.warn("MPS with grouped sites: "
-                          "splitting afterwards not supported")
+            warnings.warn("MPS with grouped sites: " "splitting afterwards not supported")
         if "site_pipes" in h5gr_orig:  # (only if it was originially converted from old tenpy)
             h5gr_new["site_pipes"] = h5gr_orig["site_pipes"]
         else:
@@ -123,7 +123,7 @@ class Converter(Hdf5Converter):
         if bc == 'infinite' or bc == 'periodic':
             pass  # fine
         elif bc == 'finite':
-            pass # fine
+            pass  # fine
         elif bc == 'segment':
             Id_LR.append(Id_LR0)
         else:
@@ -135,8 +135,10 @@ class Converter(Hdf5Converter):
         # tensors
         tensors = self.load(subpath_orig + "tensors")
         # convert leg labels and order
-        tensors = [B.transpose(['wL', 'wR', 'p', 'p*']).iset_leg_labels(['w', 'w*', 'p', 'p*'])
-                   for B in tensors]
+        tensors = [
+            B.transpose(['wL', 'wR', 'p', 'p*']).iset_leg_labels(['w', 'w*', 'p', 'p*'])
+            for B in tensors
+        ]
         self.save(tensors, subpath_new + "tensors")
         self.convert_group(h5gr_new["tensors"])  # implicitly calls self.convert_array
 
@@ -176,7 +178,7 @@ class Converter(Hdf5Converter):
             H_bond = list(self.load(subpath_orig + "H_bond"))
             # new tenpy: always L entries, entry b is sites (b-1, b), None if not to be used.
             # old tenpy: always L entries, entry b is sites (b, b+1), for finite: last entry 0.
-            H_bond =  H_bond[1:] + [H_bond[0]]  # now entry b is sites (b, b+1)
+            H_bond = H_bond[1:] + [H_bond[0]]  # now entry b is sites (b, b+1)
             if bc == 'finite':
                 p0 = H_bond[-2].get_leg('p1')
                 p1 = H_bond[0].get_leg('p0')
@@ -200,7 +202,7 @@ class Converter(Hdf5Converter):
         onsite_ops = {}
         for i, s in enumerate(sites):
             for opname in s.opnames:
-                op_list = onsite_ops.setdefault(opname, [None]*L)
+                op_list = onsite_ops.setdefault(opname, [None] * L)
                 op_list[i] = s.get_op(opname)
         self.save(onsite_ops, subpath_new + "onsite_operators")
         self.save({}, subpath_new + "bond_operators")  # doesn't exist (yet?) in new TeNPy
@@ -209,34 +211,34 @@ class Converter(Hdf5Converter):
         dims = np.array([s.dim for s in sites])
         self.save(dims, subpath_new + "dimensions")
 
-
-    for _model in [('tenpy.models.model', 'Model'), # base class
-                   ('tenpy.models.model', 'NearestNeighborModel'), # base class
-                   ('tenpy.models.model', 'MPOModel'), # base class
-                   ('tenpy.models.model', 'CouplingMPOModel'), # base class
-                   # and derived classes defined in TeNPy
-                   # TODO: hard-coded list of models
-                   # needs to be updated if new models are implemented in TeNPy
-                   ('tenpy.models.fermions_spinless', 'FermionModel'),
-                   ('tenpy.models.fermions_spinless', 'FermionChain'),
-                   ('tenpy.models.haldane', 'BosonicHaldaneModel'),
-                   ('tenpy.models.haldane', 'FermionicHaldaneModel'),
-                   ('tenpy.models.hofstadter', 'HofstadterFermions'),
-                   ('tenpy.models.hofstadter', 'HofstadterBosons'),
-                   ('tenpy.models.hubbard', 'BoseHubbardModel'),
-                   ('tenpy.models.hubbard', 'BoseHubbardChain'),
-                   ('tenpy.models.hubbard', 'FermiHubbardModel'),
-                   ('tenpy.models.hubbard', 'FermiHubbardChain'),
-                   ('tenpy.models.spins_nnn', 'SpinChainNNN'),
-                   ('tenpy.models.spins_nnn', 'SpinChainNNN2'),
-                   ('tenpy.models.spins', 'SpinModel'),
-                   ('tenpy.models.spins', 'SpinChain'),
-                   ('tenpy.models.tf_ising', 'TFIModel'),
-                   ('tenpy.models.tf_ising', 'TFIChain'),
-                   ('tenpy.models.toric_code', 'ToricCode'),
-                   ('tenpy.models.xxz_chain', 'XXZChain'),
-                   ('tenpy.models.xxz_chain', 'XXZChain2'),
-                   ]:
+    for _model in [
+        ('tenpy.models.model', 'Model'),  # base class
+        ('tenpy.models.model', 'NearestNeighborModel'),  # base class
+        ('tenpy.models.model', 'MPOModel'),  # base class
+        ('tenpy.models.model', 'CouplingMPOModel'),  # base class
+            # and derived classes defined in TeNPy
+            # TODO: hard-coded list of models
+            # needs to be updated if new models are implemented in TeNPy
+        ('tenpy.models.fermions_spinless', 'FermionModel'),
+        ('tenpy.models.fermions_spinless', 'FermionChain'),
+        ('tenpy.models.haldane', 'BosonicHaldaneModel'),
+        ('tenpy.models.haldane', 'FermionicHaldaneModel'),
+        ('tenpy.models.hofstadter', 'HofstadterFermions'),
+        ('tenpy.models.hofstadter', 'HofstadterBosons'),
+        ('tenpy.models.hubbard', 'BoseHubbardModel'),
+        ('tenpy.models.hubbard', 'BoseHubbardChain'),
+        ('tenpy.models.hubbard', 'FermiHubbardModel'),
+        ('tenpy.models.hubbard', 'FermiHubbardChain'),
+        ('tenpy.models.spins_nnn', 'SpinChainNNN'),
+        ('tenpy.models.spins_nnn', 'SpinChainNNN2'),
+        ('tenpy.models.spins', 'SpinModel'),
+        ('tenpy.models.spins', 'SpinChain'),
+        ('tenpy.models.tf_ising', 'TFIModel'),
+        ('tenpy.models.tf_ising', 'TFIChain'),
+        ('tenpy.models.toric_code', 'ToricCode'),
+        ('tenpy.models.xxz_chain', 'XXZChain'),
+        ('tenpy.models.xxz_chain', 'XXZChain2'),
+    ]:
         mappings[_model] = (('models.model', 'model'), convert_model)
     del _model
 

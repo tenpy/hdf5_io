@@ -77,8 +77,9 @@ class Converter(Hdf5Converter):
         tensors = self.convert_group(h5gr_orig["tensors"])  # implicitly calls self.convert_array
         tensors = self.load(tensors.name)
         # convert leg labels and order
-        tensors = [B.transpose(['b', 'p', 'b*']).iset_leg_labels(['vL', 'p', 'vR'])
-                   for B in tensors]
+        tensors = [
+            B.transpose(['b', 'p', 'b*']).iset_leg_labels(['vL', 'p', 'vR']) for B in tensors
+        ]
         chinfo = tensors[0].legs[0].chinfo
         for B in tensors:
             for leg in B.legs:
@@ -103,15 +104,15 @@ class Converter(Hdf5Converter):
             SVs[0] = SVs[-1]
         elif bc == 'finite':
             SVs[0] = SVs[-1] = np.ones([1])
-        else: # segment
+        else:  # segment
             SVs[0] = SVs.pop()
         self.save(SVs, subpath_new + "singular_values")
 
         # canonical form
         form = self.load(subpath_orig + "canonical_form")
         if type(form) == np.ndarray:
-            assert form.shape == (2,)
-            form = np.array([form]*L)  # old tenpy with single 2-tuple, valid for all sites
+            assert form.shape == (2, )
+            form = np.array([form] * L)  # old tenpy with single 2-tuple, valid for all sites
         else:  # old tenpy: list of array
             form = np.array(form)
             assert form.shape == (L, 2)
@@ -121,15 +122,13 @@ class Converter(Hdf5Converter):
         h5gr_new.attrs["L"] = self.get_attr(h5gr_orig, "L")
         h5gr_new.attrs["max_bond_dimension"] = self.get_attr(h5gr_orig, "max_bond_dimension")
 
-        h5gr_new.attrs["norm"] = 1 # required by new TeNPy
+        h5gr_new.attrs["norm"] = 1  # required by new TeNPy
         h5gr_new.attrs["grouped"] = grouped = self.get_attr(h5gr_orig, "grouped")
         if grouped > 1:
-            warnings.warn("MPS with grouped sites: "
-                          "splitting after conversion not supported")
+            warnings.warn("MPS with grouped sites: " "splitting after conversion not supported")
         # still copy site_pipes: allow converting back to old tenpy for splitting
         h5gr_new["site_pipes"] = h5gr_orig["site_pipes"]
         h5gr_new.attrs["transfermatrix_keep"] = self.get_attr(h5gr_orig, "transfermatrix_keep")
-
 
     mappings[('mps.mps', 'iMPS')] = (('tenpy.networks.mps', 'MPS'), convert_MPS)
 
@@ -156,8 +155,10 @@ class Converter(Hdf5Converter):
         tensors = self.convert_group(h5gr_orig["tensors"])  # convert the arrays
         tensors = self.load(tensors.name)
         # convert leg labels.
-        tensors = [W.transpose(['w', 'w*', 'p', 'p*']).iset_leg_labels(['wL', 'wR', 'p', 'p*'])
-                   for W in tensors]
+        tensors = [
+            W.transpose(['w', 'w*', 'p', 'p*']).iset_leg_labels(['wL', 'wR', 'p', 'p*'])
+            for W in tensors
+        ]
         chinfo = tensors[0].legs[0].chinfo
         for W in tensors:
             for leg in W.legs:
@@ -264,26 +265,27 @@ class Converter(Hdf5Converter):
         type_repr = self.save_dict_content(data, h5gr_new, subpath_new)
         h5gr_new.attrs[hdf5_io.ATTR_FORMAT] = type_repr
 
-    for _model in [('models.model', 'model'), # base class
-                   # and derived classes defined in tenpy
-                   ('models.bhf', 'bhf_model'),
-                   ('models.boson', 'boson_model'),
-                   ('models.boson2d', 'boson2d_model'),
-                   ('models.double_model', 'double_model'),
-                   ('models.dual_ising', 'dual_ising_model'),
-                   ('models.fermions_chain', 'sf_model'),
-                   ('models.fermions_hubbard', 'fh_model'),
-                   ('models.fermions_ladder', 'fermionic_model'),
-                   ('models.height_models', 'height_model'),
-                   ('models.levingu', 'levingu_model'),
-                   ('models.long_range_spin_chain', 'spin_chain_model'),
-                   ('models.majorana_island', 'majorana_island_model'),
-                   ('models.multilayer_qh', 'QH_model'),
-                   ('models.potts', 'potts_model'),
-                   ('models.quantum_hall', 'QH_model'),
-                   ('models.spin_chain', 'spin_chain_model'),
-                   ('models.xxz_tfi', 'xxz_tfi_model'),
-                   ]:
+    for _model in [
+        ('models.model', 'model'),  # base class
+            # and derived classes defined in tenpy
+        ('models.bhf', 'bhf_model'),
+        ('models.boson', 'boson_model'),
+        ('models.boson2d', 'boson2d_model'),
+        ('models.double_model', 'double_model'),
+        ('models.dual_ising', 'dual_ising_model'),
+        ('models.fermions_chain', 'sf_model'),
+        ('models.fermions_hubbard', 'fh_model'),
+        ('models.fermions_ladder', 'fermionic_model'),
+        ('models.height_models', 'height_model'),
+        ('models.levingu', 'levingu_model'),
+        ('models.long_range_spin_chain', 'spin_chain_model'),
+        ('models.majorana_island', 'majorana_island_model'),
+        ('models.multilayer_qh', 'QH_model'),
+        ('models.potts', 'potts_model'),
+        ('models.quantum_hall', 'QH_model'),
+        ('models.spin_chain', 'spin_chain_model'),
+        ('models.xxz_tfi', 'xxz_tfi_model'),
+    ]:
         mappings[_model] = (('tenpy.models.model', 'MPOModel'), convert_model)
     del _model
 
