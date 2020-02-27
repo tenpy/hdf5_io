@@ -182,9 +182,9 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
         h5gr_orig, subpath_orig, h5gr_new, subpath_new = self.move_backup(h5gr)
         if self.verbose > 1:
             print("converting group {0!r} from {1!s} to {2!s}, backup {3!s}".format(
-                h5gr.name, convert_from, convert_to, h5gr_orig.name))
+                h5gr_new.name, convert_from, convert_to, h5gr_orig.name))
         elif self.verbose:
-            print("converting group", h5gr.name)
+            print("converting group", subpath_new)
         if isinstance(convert_to, tuple):
             new_module_name, new_class_name = convert_to
             h5gr_new.attrs[ATTR_TYPE] = REPR_HDF5EXPORTABLE
