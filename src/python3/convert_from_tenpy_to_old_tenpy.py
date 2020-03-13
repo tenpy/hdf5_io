@@ -187,6 +187,8 @@ class Converter(Hdf5Converter):
             H_bond = [H.transpose(['p0', 'p1', 'p0*', 'p1*']) for H in H_bond]
             self.save(H_bond, subpath_new + "H")
             self.convert_group(h5gr_new["H"])  # convert npc Arrays
+        else:
+            self.save(None, subpath_new + "H")
 
         # convert MPO directly to extract the converted tensors
         # (conversion might also have happend before starting the conversion of the model!)
