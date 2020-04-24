@@ -86,7 +86,7 @@ Guidelines of the format:
 2. Allow to save (nested) python lists, tuples and dictionaries with values (and keys) which can be saved.
 3. Allow user-defined classes to implement a well-defined interface which allows to save instances of that class, hence extending what data can be saved.
    An instance of a class supporting the interface gets saved as an HDF5 :class:`Group`.
-   Class attributes are stored as entries of the group, metadata like the type should be stored in HDF5 attributes, see :h5py:doc:`attr`.
+   Class attributes are stored as entries of the group, metadata like the type should be stored in HDF5 attributes, see :h5py:doc:`high/attr`.
 4. Simple and intuitive, human-readable structure for the HDF5 paths.
    For example, saving a simple dictionary ``{'a': np.arange(10), 'b': 123.45}`` should result in an
    HDF5 file with just the two data sets ``/a`` and ``/b``. 
