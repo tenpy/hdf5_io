@@ -307,7 +307,7 @@ class Hdf5Converter(hdf5_io.Hdf5Loader, hdf5_io.Hdf5Saver):
 
 
 def parse_args(converter_cls=None):
-    doc = converter_cls.__module__.__doc__ if converter_cls is not None else __doc__
+    doc = converter_cls.__doc__ if converter_cls is not None else __doc__
     parser = argparse.ArgumentParser(description=doc)
     parser.add_argument(
         '-B',
