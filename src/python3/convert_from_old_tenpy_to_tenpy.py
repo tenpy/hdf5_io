@@ -150,7 +150,7 @@ class Converter(Hdf5Converter):
     def convert_MPO(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
         L = self.get_attr(h5gr_orig, "L")
         if self.get_attr(h5gr_orig["translate_Q1_data"], hdf5_io.ATTR_TYPE) != hdf5_io.REPR_NONE:
-            raise ValueError("TODO: non-trivial 'translate_Q1_data' not supported in new TeNPy")
+            warnings.warn("non-trivial 'translate_Q1_data' not supported in new TeNPy")
         # tensors: (implicitly) call above conversion function
         tensors = self.convert_group(h5gr_orig["tensors"])  # convert the arrays
         tensors = self.load(tensors.name)
@@ -193,9 +193,9 @@ class Converter(Hdf5Converter):
     def convert_model(self, h5gr_orig, subpath_orig, h5gr_new, subpath_new):
         L = self.get_attr(h5gr_orig, "L")
         if self.load(subpath_orig + "add_conj"):
-            raise ValueError("TODO: add_conj=True currently not supported in new TenPy")
+            raise NotImplementedError("add_conj=True corresponds to `explicit_plus_hc` flag")
         if self.get_attr(h5gr_orig["translate_Q1_data"], hdf5_io.ATTR_TYPE) != hdf5_io.REPR_NONE:
-            raise ValueError("TODO: non-trivial 'translate_Q1_data' not supported in new TeNPy")
+            warnings.warn("non-trivial 'translate_Q1_data' not supported in new TeNPy")
         # convert the npc arrays
         H_mpo_tensors = self.convert_group(h5gr_orig["H_mpo"])
         H_mpo_tensors = self.load(H_mpo_tensors.name)

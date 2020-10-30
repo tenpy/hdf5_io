@@ -152,6 +152,8 @@ def load(filename):
 # everything below is for our export/import with our self-definded HDF5 format.
 # =================================================================================
 
+REPR_IGNORED = "ignore"  #: ignore the object/dataset during loading and saving
+
 #: saved object is instance of a user-defined class following the :class:`Hdf5Exportable` style.
 REPR_HDF5EXPORTABLE = "instance"
 
@@ -176,7 +178,10 @@ REPR_SET = "set"  #: saved object represents a set
 REPR_DICT_GENERAL = "dict"  #: saved object represents a dict with complicated keys
 REPR_DICT_SIMPLE = "simple_dict"  #: saved object represents a dict with simple keys
 REPR_DTYPE = "dtype"  #: saved object represents a np.dtype
-REPR_IGNORED = "ignore"  #: ignore the object/dataset during loading and saving
+
+REPR_FUNCTION = "function" #: saved object represents a function
+REPR_CLASS = "class" #: saved object returns a class
+
 
 #: tuple of (type, type_repr) which h5py can save as datasets; one entry for each type.
 TYPES_FOR_HDF5_DATASETS = tuple([
@@ -611,6 +616,21 @@ class Hdf5Saver:
 
     dispatch_save[Hdf5Ignored] = (save_ignored, REPR_IGNORED)
 
+    def save_class_or_function(self, obj, path, type_repr):
+        """Save a function."""
+        full_name = obj.__qualname__ + " in " + obj.__module__
+        self.h5group[path] = full_name  # save as string dataset
+        h5gr = self.h5group[path]
+        h5gr.attrs[ATTR_TYPE] = type_repr
+        h5gr.attrs[ATTR_CLASS] = obj.__qualname__
+        h5gr.attrs[ATTR_MODULE] = obj.__module__
+        self.memorize_save(h5gr, obj)
+        return h5gr
+        return h5gr
+
+    dispatch_save[type(save)] = (save_class_or_function, REPR_FUNCTION)
+    dispatch_save[type] = (save_class_or_function, REPR_CLASS)
+
     # clean up temporary variables
     del _t
     del _type_repr
@@ -893,6 +913,24 @@ class Hdf5Loader:
         return Hdf5Ignored(h5gr.name)
 
     dispatch_load[REPR_IGNORED] = (load_ignored, REPR_IGNORED)
+
+    def load_class_or_function(self, h5gr, type_info, subpath):
+        """Load a class or function from its qualified name and module."""
+        module_name = self.get_attr(h5gr, ATTR_MODULE)
+        class_name = self.get_attr(h5gr, ATTR_CLASS)
+        try:
+            cls = self.find_class(module_name, class_name)
+        except (ImportError, AttributeError):
+            msg = "Can't import class/function {0!s} from {1!s}".format(class_name, module_name)
+            if self.ignore_unknown:
+                warnings.warn(msg, UserWarning)
+                return Hdf5Ignored(msg)
+            else:
+                raise
+        return cls
+
+    dispatch_load[REPR_FUNCTION] = (load_class_or_function, REPR_FUNCTION)
+    dispatch_load[REPR_CLASS] = (load_class_or_function, REPR_CLASS)
 
     # clean up temporary variables
     del _t
