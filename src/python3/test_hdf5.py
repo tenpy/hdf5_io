@@ -85,7 +85,7 @@ def export_to_datadir():
     with h5py.File(filename, 'w') as f:
         hdf5_io.save_to_hdf5(f, data)
 
-
+@pytest.mark.filterwarnings(r'ignore:Hdf5Saver.* object of type.*:UserWarning')
 def test_hdf5_export_import():
     """Try subsequent export and import to pickle."""
     data = gen_example_data()
