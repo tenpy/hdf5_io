@@ -435,8 +435,9 @@ class Hdf5Saver:
             obj_save_hdf5(self, h5gr, subpath)  # should save the actual data
             return h5gr
 
-        warnings.warn("Hdf5Saver: object of type {t!r} without explicit HDF5 format; "
-                      "fall back to pickle protocol".format(t=type(obj)), UserWarning)
+        warnings.warn(
+            "Hdf5Saver: object of type {t!r} without explicit HDF5 format; "
+            "fall back to pickle protocol".format(t=type(obj)), UserWarning)
 
         obj_reduce = getattr(obj, "__reduce__", None)
         if obj_reduce is not None:
