@@ -72,6 +72,12 @@ import importlib
 import warnings
 import sys
 
+try:
+    import h5py
+    h5py_version = h5py.version.version_tuple
+except ImportError:
+    h5py_version = (0, 0)
+
 __all__ = [
     'save', 'load', 'valid_hdf5_path_component', 'Hdf5FormatError', 'Hdf5ExportError',
     'Hdf5ImportError', 'Hdf5Exportable', 'Hdf5Ignored', 'Hdf5Saver', 'Hdf5Loader', 'save_to_hdf5',
@@ -85,15 +91,15 @@ def save(data, filename, mode='w'):
     This function guesses the type of the file from the filename ending.
     Supported endings:
 
-    ======== ===============================
-    ending   description
-    ======== ===============================
-    .pkl     Pickle without compression
-    -------- -------------------------------
-    .pklz    Pickle with gzip compression.
-    -------- -------------------------------
-    .hdf5    Hdf5 file (using `h5py`).
-    ======== ===============================
+    ============ ===============================
+    ending       description
+    ============ ===============================
+    .pkl         Pickle without compression
+    ------------ -------------------------------
+    .pklz        Pickle with gzip compression.
+    ------------ -------------------------------
+    .hdf5, .h5   HDF5 file (using `h5py`).
+    ============ ===============================
 
     Parameters
     ----------
@@ -112,7 +118,6 @@ def save(data, filename, mode='w'):
         with gzip.open(filename, mode + 'b') as f:
             pickle.dump(data, f)
     elif filename.endswith('.hdf5') or filename.endswith('.h5'):
-        import h5py
         with h5py.File(filename, mode) as f:
             save_to_hdf5(f, data)
     else:
@@ -142,7 +147,6 @@ def load(filename):
         with gzip.open(filename, 'rb') as f:
             data = pickle.load(f)
     elif filename.endswith('.hdf5') or filename.endswith('.h5'):
-        import h5py
         with h5py.File(filename, 'r') as f:
             data = load_from_hdf5(f)
     else:
@@ -332,7 +336,7 @@ class Hdf5Ignored(object):
 
 
 class Hdf5Saver:
-    """Engine to save simple enough objects into a HDF5 file.
+    """Class to save simple enough objects into a HDF5 file.
 
     The intended use of this class is through :func:`save_to_hdf5`, which is simply an alias
     for ``Hdf5Saver(h5group).save(obj, path)``.
