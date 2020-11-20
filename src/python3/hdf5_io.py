@@ -871,7 +871,6 @@ class Hdf5Loader:
     if h5py_version >= (3, 0):  # for older h5py versions, just read the dataset directly.
         dispatch_load[REPR_STR] = (load_str, str)
 
-
     def load_list(self, h5gr, type_info, subpath):
         """Load a list."""
         obj = []
