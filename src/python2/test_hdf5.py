@@ -91,21 +91,27 @@ def test_hdf5_export_import():
         'global_class': DummyClass,
         'instance': dc,
         # 'method': dc.dummy_method,  # python 2.7 doesn't support pickling methods
+        'excluded_from_load': np.arange(3.),
     })
     data_with_ignore = data.copy()
     data_with_ignore['ignore_save'] = hdf5_io.Hdf5Ignored()
     with tempfile.TemporaryFile() as tf:
         with h5py.File(tf, 'w') as f:
-            hdf5_io.save_to_hdf5(f, data)
+            hdf5_io.save_to_hdf5(f, data_with_ignore)
             f['ignore_load'] = "ignore_during_load"
             f['ignore_load'].attrs[hdf5_io.ATTR_TYPE] = hdf5_io.REPR_IGNORED
         tf.seek(0)  # reset pointer to beginning of file for reading
         with h5py.File(tf, 'r') as f:
-            data_imported = hdf5_io.load_from_hdf5(f)
+            data_imported = hdf5_io.load_from_hdf5(f,
+                                                   ignore_unknown=False,
+                                                   exclude=['/excluded_from_load'])
     # data is a dict with simple keys
     # so 'ignore_load' should be loaded as Hdf5Ignored instance
     assert isinstance(data_imported['ignore_load'], hdf5_io.Hdf5Ignored)
     del data_imported['ignore_load']
+
+    assert isinstance(data_imported['excluded_from_load'], hdf5_io.Hdf5Ignored)
+    data['excluded_from_load'] = hdf5_io.Hdf5Ignored('/excluded_from_load')
 
     assert_equal_data(data_imported, data)
 

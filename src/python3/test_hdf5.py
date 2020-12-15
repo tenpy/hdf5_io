@@ -85,6 +85,7 @@ def export_to_datadir():
     with h5py.File(filename, 'w') as f:
         hdf5_io.save_to_hdf5(f, data)
 
+
 @pytest.mark.filterwarnings(r'ignore:Hdf5Saver.* object of type.*:UserWarning')
 def test_hdf5_export_import():
     """Try subsequent export and import to pickle."""
@@ -95,6 +96,7 @@ def test_hdf5_export_import():
         'global_class': DummyClass,
         'instance': dc,
         'method': dc.dummy_method,
+        'excluded_from_load': np.arange(3.),
     })
     data_with_ignore = data.copy()
     data_with_ignore['ignore_save'] = hdf5_io.Hdf5Ignored()
@@ -105,11 +107,16 @@ def test_hdf5_export_import():
             f['ignore_load'] = "ignore_during_load"
             f['ignore_load'].attrs[hdf5_io.ATTR_TYPE] = hdf5_io.REPR_IGNORED
         with h5py.File(os.path.join(tdir, filename), 'r') as f:
-            data_imported = hdf5_io.load_from_hdf5(f, ignore_unknown=False)
+            data_imported = hdf5_io.load_from_hdf5(f,
+                                                   ignore_unknown=False,
+                                                   exclude=['/excluded_from_load'])
     # data is a dict with simple keys
     # so 'ignore_load' should be loaded as Hdf5Ignored instance
     assert isinstance(data_imported['ignore_load'], hdf5_io.Hdf5Ignored)
     del data_imported['ignore_load']
+
+    assert isinstance(data_imported['excluded_from_load'], hdf5_io.Hdf5Ignored)
+    data['excluded_from_load'] = hdf5_io.Hdf5Ignored('/excluded_from_load')
 
     assert_equal_data(data_imported, data)
 
