@@ -701,6 +701,7 @@ class Hdf5Saver:
         self.save(obj.descr, subpath + 'descr')
         return h5gr
 
+    # note: numpy supports python2 only for np.__version__ < 0.18
     dispatch_save[np.dtype] = (save_dtype, REPR_DTYPE)
 
     def save_ignored(self, obj, path, type_repr):
