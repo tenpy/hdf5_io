@@ -136,7 +136,7 @@ class Converter(Hdf5Converter):
         """Convert `vL`-> `IdL` and `vR`->`IdR` for an MPO."""
         # new tenpy: bond b left  of site b, always L+1 entries
         # old tenpy: bond b right of site b, length L+1 for segment bc, others L
-        Id_LR = [None] + Id_LR  # now entry b is left of site b
+        Id_LR = [None] + list(Id_LR) # now entry b is left of site b
         if bc == 'infinite' or bc == 'periodic':
             Id_LR[0] = Id_LR[-1]
         elif bc == 'finite':
@@ -251,16 +251,18 @@ class Converter(Hdf5Converter):
         # H_bond
         if "H" in h5gr_orig:
             H_bond = self.convert_group(h5gr_orig["H"])  # convert npc Arrays
-            H_bond = list(self.load(H_bond.name))
-            # new tenpy: always L entries, entry b is sites (b-1, b), None if not to be used.
-            # old tenpy: always L entries, entry b is sites (b, b+1), for finite: last entry 0.
-            H_bond = [H_bond[-1]] + H_bond[:-1]  # now entry b is sites (b-1, b)
-            for i, H in enumerate(H_bond):
-                if H is not None:
-                    H_bond[i] = H.transpose(['p0', 'p1', 'p0*', 'p1*'])  # copy, same labels
-            if bc_MPS == 'finite':
-                H_bond[0] = None
-            data["H_bond"] = H_bond
+            H_bond = self.load(H_bond.name)
+            if H_bond is not None:
+                H_bond = list(H_bond)
+                # new tenpy: always L entries, entry b is sites (b-1, b), None if not to be used.
+                # old tenpy: always L entries, entry b is sites (b, b+1), for finite: last entry 0.
+                H_bond = [H_bond[-1]] + H_bond[:-1]  # now entry b is sites (b-1, b)
+                for i, H in enumerate(H_bond):
+                    if H is not None:
+                        H_bond[i] = H.transpose(['p0', 'p1', 'p0*', 'p1*'])  # copy, same labels
+                if bc_MPS == 'finite':
+                    H_bond[0] = None
+                data["H_bond"] = H_bond
         # save the contents of the model
         type_repr = self.save_dict_content(data, h5gr_new, subpath_new)
         h5gr_new.attrs[hdf5_io.ATTR_FORMAT] = type_repr
