@@ -2,7 +2,7 @@ Converting files: from the old TeNPy to the new TeNPy (and vice versa)
 ======================================================================
 
 Here, "new TeNPy" referst to https://github.com/tenpy/tenpy, and
-"old TeNPy" refers to the precurser written in Python 2.
+"old TeNPy" refers to the precurser by Mike Zaletel, Frank Pollmann and Roger Mong, originally written in Python 2.
 
 You need to be able to export/import to HDF5 from both the old and the new TeNPy.
 Hence you need to have `h5py` installed for both Python 2 and Python 3 (the ones where you can import TeNPy, respectively).
@@ -33,7 +33,7 @@ Given that, you need to do the following steps.
 
 3. Import the data in the new TeNPy::
 
-    # in Pytho3 with new TeNPy
+    # in Python3 with new TeNPy
 
     import h5py
 
