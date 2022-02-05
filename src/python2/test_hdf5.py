@@ -30,7 +30,7 @@ class DummyClass(hdf5_io.Hdf5Exportable):
 def gen_example_data():
     data = {
         'None': None,
-        'scalars': [0, np.int64(1), 2., np.float64(3.), 4.j, 'five', True],
+        'scalars': [0, np.int64(1), 2., np.float64(3.), 4.j, 'five', True, 2**70],
         'arrays': [np.array([6, 66]), np.array([]), np.zeros([])],
         'iterables': [[], [11, 12],
                       tuple([]),

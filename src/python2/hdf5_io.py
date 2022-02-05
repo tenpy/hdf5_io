@@ -41,6 +41,7 @@ Names for the ``ATTR_TYPE`` attribute:
 
 .. autodata:: REPR_ARRAY
 .. autodata:: REPR_INT
+.. autodata:: REPR_INT_AS_STR
 .. autodata:: REPR_FLOAT
 .. autodata:: REPR_STR
 .. autodata:: REPR_COMPLEX
@@ -82,8 +83,8 @@ __all__ = [
     'save', 'load', 'find_global', 'valid_hdf5_path_component', 'Hdf5FormatError',
     'Hdf5ExportError', 'Hdf5ImportError', 'Hdf5Exportable', 'Hdf5Ignored', 'Hdf5Saver',
     'Hdf5Loader', 'save_to_hdf5', 'load_from_hdf5', 'REPR_IGNORED', 'REPR_HDF5EXPORTABLE',
-    'REPR_REDUCE', 'REPR_ARRAY', 'REPR_INT', 'REPR_FLOAT', 'REPR_STR', 'REPR_COMPLEX',
-    'REPR_INT64', 'REPR_FLOAT64', 'REPR_COMPLEX128', 'REPR_INT32', 'REPR_FLOAT32',
+    'REPR_REDUCE', 'REPR_ARRAY', 'REPR_INT', 'REPR_INT_AS_STR', 'REPR_FLOAT', 'REPR_STR',
+    'REPR_COMPLEX', 'REPR_INT64', 'REPR_FLOAT64', 'REPR_COMPLEX128', 'REPR_INT32', 'REPR_FLOAT32',
     'REPR_COMPLEX64', 'REPR_BOOL', 'REPR_NONE', 'REPR_RANGE', 'REPR_LIST', 'REPR_TUPLE',
     'REPR_SET', 'REPR_DICT_GENERAL', 'REPR_DICT_SIMPLE', 'REPR_DTYPE', 'REPR_FUNCTION',
     'REPR_CLASS', 'REPR_GLOBAL', 'TYPES_FOR_HDF5_DATASETS', 'ATTR_TYPE', 'ATTR_CLASS',
@@ -190,6 +191,7 @@ REPR_REDUCE = "reduce"  #: saved object had a __reduce__ method according to pic
 
 REPR_ARRAY = "array"  #: saved object represents a numpy array
 REPR_INT = "int"  #: saved object represents a (python) int
+REPR_INT_AS_STR = "int_as_str"  #: saved object represents int > 2^64 as (base-10) string
 REPR_FLOAT = "float"  #: saved object represents a (python) float
 REPR_STR = "str"  #: saved object represents a (python unicode) string
 REPR_COMPLEX = "complex"  #: saved object represents a complex number
@@ -459,6 +461,10 @@ class Hdf5Saver:
             obj_save_hdf5(self, h5gr, subpath)  # should save the actual data
             return h5gr
 
+        warnings.warn(
+            "Hdf5Saver: object of type {t!r} without explicit HDF5 format; "
+            "fall back to pickle protocol".format(t=type(obj)), UserWarning)
+
         obj_reduce = getattr(obj, "__reduce__", None)
         if obj_reduce is not None:
 
@@ -591,6 +597,15 @@ class Hdf5Saver:
         return h5gr
 
     dispatch_save[str] = (save_string, REPR_STR)
+
+    def save_converted_to_str(self, obj, path, type_repr):
+        self.h5group[path] = str(obj).decode()  # save all strings as unicode strings!
+        h5gr = self.h5group[path]
+        h5gr.attrs[ATTR_TYPE] = type_repr
+        self.memorize_save(h5gr, obj)
+        return h5gr
+
+    dispatch_save[long] = (save_converted_to_str, REPR_INT_AS_STR)
 
     def save_iterable(self, obj, path, type_repr):
         """Save an iterable `obj` like a list, tuple or set; in dispatch table."""
@@ -898,6 +913,15 @@ class Hdf5Loader:
 
     for _t, _type_repr in TYPES_FOR_HDF5_DATASETS:
         dispatch_load[_type_repr] = (load_dataset, _t)
+
+    def load_converted_to_str(self, h5gr, type_info, subpath):
+        """Load objects converted to string during save, in particular int > 2^64."""
+        obj = str(h5gr[()])
+        obj = type_info(obj)
+        self.memorize_load(h5gr, obj)
+        return obj
+
+    dispatch_load[REPR_INT_AS_STR] = (load_converted_to_str, int)
 
     def load_list(self, h5gr, type_info, subpath):
         """Load a list."""
