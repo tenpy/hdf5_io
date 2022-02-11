@@ -31,7 +31,8 @@ class DummyClass(hdf5_io.Hdf5Exportable):
 def gen_example_data():
     data = {
         'None': None,
-        'scalars': [0, np.int64(1), 2., np.float64(3.), 4.j, 'five', True, 2**70],
+        'scalars': [0, np.int64(1), 2., np.float64(3.), 4.j, 'five', True, 2**70,
+                    b'a byte string'],
         'arrays': [np.array([6, 66]), np.array([]), np.zeros([])],
         'iterables': [[], [11, 12],
                       tuple([]),
@@ -55,7 +56,10 @@ def gen_example_data():
 
 def assert_equal_data(data_imported, data_expected, max_recursion_depth=10):
     """Check that the imported data is as expected."""
-    assert isinstance(data_imported, type(data_expected))
+    assert (isinstance(data_imported, type(data_expected))
+            or (type(data_expected) is bytes and isinstance(data_imported, str))
+            # special case because str is bytes in python2, so no way to distinguish
+            )
     if hasattr(data_expected, 'test_sanity'):
         data_imported.test_sanity()
     if isinstance(data_expected, dict):

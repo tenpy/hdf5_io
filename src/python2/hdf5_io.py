@@ -194,6 +194,7 @@ REPR_INT = "int"  #: saved object represents a (python) int
 REPR_INT_AS_STR = "int_as_str"  #: saved object represents int > 2^64 as (base-10) string
 REPR_FLOAT = "float"  #: saved object represents a (python) float
 REPR_STR = "str"  #: saved object represents a (python unicode) string
+REPR_BYTES = "bytes"  #: saved object represents a string of bytes without any encoding
 REPR_COMPLEX = "complex"  #: saved object represents a complex number
 REPR_INT64 = "np.int64"  #: saved object represents a np.int64
 REPR_FLOAT64 = "np.float64"  #: saved object represents a np.float64
@@ -222,6 +223,7 @@ TYPES_FOR_HDF5_DATASETS = tuple([
     (int, REPR_INT),
     (float, REPR_FLOAT),
     (str, REPR_STR),
+    (bytes, REPR_BYTES),
     (complex, REPR_COMPLEX),
     (np.int64, REPR_INT64),
     (np.float64, REPR_FLOAT64),
