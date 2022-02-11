@@ -32,7 +32,7 @@ def gen_example_data():
         'None': None,
         'scalars': [0, np.int64(1), 2., np.float64(3.), 4.j, 'five', True, 2**70,
                     b'a byte string'],
-        'arrays': [np.array([6, 66]), np.array([]), np.zeros([])],
+        'arrays': [np.array([6, 66]), np.array([]), np.zeros([]), np.array([True, False])],
         'iterables': [[], [11, 12],
                       tuple([]),
                       tuple([1, 2, 3]),
