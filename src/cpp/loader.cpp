@@ -63,8 +63,8 @@ Hdf5Loader::load(py::object path)
         path_str = path.cast<std::string>();
         h5gr = h5group[py::str(path_str)];
     }
-    std::string subpath = (!path_str.empty() && path_str.back() == '/') ? path_str
-                                                                        : (path_str + "/");
+    std::string subpath =
+      (!path_str.empty() && path_str.back() == '/') ? path_str : (path_str + "/");
     py::object in_memo = memo_load.attr("get")(h5_id(h5gr));
     if (!in_memo.is_none())
         return in_memo;
@@ -158,7 +158,9 @@ Hdf5Loader::load_str(py::object h5gr, py::object type_info, std::string const& s
 }
 
 py::object
-Hdf5Loader::load_converted_to_str(py::object h5gr, py::object type_info, std::string const& subpath)
+Hdf5Loader::load_converted_to_str(py::object h5gr,
+                                  py::object type_info,
+                                  std::string const& subpath)
 {
     (void)subpath;
     py::object obj = h5gr.attr("asstr")()[py::make_tuple()];
@@ -249,7 +251,8 @@ Hdf5Loader::load_general_dict(py::object h5gr, py::object type_info, std::string
     py::dict obj;
     memorize_load(h5gr, obj);
     py::object keys = load_list(h5gr[py::str("keys")], py::str(REPR_LIST), subpath + "keys/");
-    py::object values = load_list(h5gr[py::str("values")], py::str(REPR_LIST), subpath + "values/");
+    py::object values =
+      load_list(h5gr[py::str("values")], py::str(REPR_LIST), subpath + "values/");
     obj.attr("update")(py::module_::import("builtins").attr("zip")(keys, values));
     return obj;
 }

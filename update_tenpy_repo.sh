@@ -23,10 +23,10 @@ REPOSRCFILE="tenpy/tools/hdf5_io.py"
 REPODOCFILE="doc/intro/input_output.rst"
 
 cd "$TENPYREPO"
-if test -n "$(git status -s $REPOSRCFILE $REPODOCFILE )" 
+if test -n "$(git status -s $REPOSRCFILE $REPODOCFILE )"
 then
 	echo "Erorr: git repository not clean; afraid to overwrite something."
-	exit 1 
+	exit 1
 fi
 
 cp "$THISREPO/src/python3/hdf5_io.py" "$TENPYREPO/$REPOSRCFILE"

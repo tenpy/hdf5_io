@@ -22,7 +22,7 @@ Given that, you need to do the following steps.
     initial_state = np.array([M.dn, M.dn])
     psi = iMPS.product_imps(M.d, initial_state, dtype=float, conserve=M, bc='periodic')
     data = {'model': M, 'psi': psi}
-    
+
     with h5py.File('exported.h5', 'w') as f:
         hdf5_io.save_to_hdf5(f, data)
 

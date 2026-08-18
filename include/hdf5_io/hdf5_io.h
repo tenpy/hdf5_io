@@ -65,7 +65,9 @@ class Hdf5Saver
     py::object save_masked_array(py::object obj,
                                  std::string const& path,
                                  std::string const& type_repr);
-    py::object save_iterable(py::object obj, std::string const& path, std::string const& type_repr);
+    py::object save_iterable(py::object obj,
+                             std::string const& path,
+                             std::string const& type_repr);
     void save_iterable_content(py::object obj, py::object h5gr, std::string const& subpath);
     py::object save_dict(py::object obj, std::string const& path, std::string const& type_repr);
     std::string save_dict_content(py::object obj, py::object h5gr, std::string const& subpath);
@@ -100,12 +102,16 @@ class Hdf5Loader
     py::object load_converted_to_str(py::object h5gr,
                                      py::object type_info,
                                      std::string const& subpath);
-    py::object load_masked_array(py::object h5gr, py::object type_info, std::string const& subpath);
+    py::object load_masked_array(py::object h5gr,
+                                 py::object type_info,
+                                 std::string const& subpath);
     py::object load_list(py::object h5gr, py::object type_info, std::string const& subpath);
     py::object load_set(py::object h5gr, py::object type_info, std::string const& subpath);
     py::object load_tuple(py::object h5gr, py::object type_info, std::string const& subpath);
     py::object load_dict(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_general_dict(py::object h5gr, py::object type_info, std::string const& subpath);
+    py::object load_general_dict(py::object h5gr,
+                                 py::object type_info,
+                                 std::string const& subpath);
     py::object load_simple_dict(py::object h5gr, py::object type_info, std::string const& subpath);
     py::object load_range(py::object h5gr, py::object type_info, std::string const& subpath);
     py::object load_dtype(py::object h5gr, py::object type_info, std::string const& subpath);

@@ -102,7 +102,8 @@ save_to_hdf5(py::object h5group, py::object obj, std::string path)
 py::object
 load_from_hdf5(py::object h5group, py::object path, bool ignore_unknown, py::object exclude)
 {
-    return Hdf5Loader(std::move(h5group), ignore_unknown, std::move(exclude)).load(std::move(path));
+    return Hdf5Loader(std::move(h5group), ignore_unknown, std::move(exclude))
+      .load(std::move(path));
 }
 
 void
@@ -148,8 +149,8 @@ init_dispatch_tables(py::module_& m)
 
     m.attr("TYPES_FOR_HDF5_DATASETS") = py::tuple(types_for_datasets);
 
-    add_save(np.attr("ma").attr("MaskedArray"), saver_cls.attr("save_masked_array"),
-             REPR_MASKED_ARRAY);
+    add_save(
+      np.attr("ma").attr("MaskedArray"), saver_cls.attr("save_masked_array"), REPR_MASKED_ARRAY);
     add_save(builtins.attr("list"), saver_cls.attr("save_iterable"), REPR_LIST);
     add_save(builtins.attr("tuple"), saver_cls.attr("save_iterable"), REPR_TUPLE);
     add_save(builtins.attr("set"), saver_cls.attr("save_iterable"), REPR_SET);
@@ -162,7 +163,8 @@ init_dispatch_tables(py::module_& m)
         std::string name = ty.attr("__name__").cast<std::string>();
         if (!name.empty() && name.front() == '_') {
             for (auto t2 : ty.attr("__subclasses__")())
-                add_save(py::reinterpret_borrow<py::object>(t2), saver_cls.attr("save_dtype"),
+                add_save(py::reinterpret_borrow<py::object>(t2),
+                         saver_cls.attr("save_dtype"),
                          REPR_DTYPE);
         } else {
             add_save(ty, saver_cls.attr("save_dtype"), REPR_DTYPE);
@@ -188,8 +190,8 @@ init_dispatch_tables(py::module_& m)
     add_load(REPR_DICT_SIMPLE, loader_cls.attr("load_simple_dict"), py::str(REPR_DICT_SIMPLE));
     add_load(REPR_RANGE, loader_cls.attr("load_range"), py::str(REPR_RANGE));
     add_load(REPR_DTYPE, loader_cls.attr("load_dtype"), py::str(REPR_DTYPE));
-    add_load(REPR_HDF5EXPORTABLE, loader_cls.attr("load_hdf5exportable"),
-             py::str(REPR_HDF5EXPORTABLE));
+    add_load(
+      REPR_HDF5EXPORTABLE, loader_cls.attr("load_hdf5exportable"), py::str(REPR_HDF5EXPORTABLE));
     add_load(REPR_IGNORED, loader_cls.attr("load_ignored"), py::str(REPR_IGNORED));
     add_load(REPR_FUNCTION, loader_cls.attr("load_global"), py::str(REPR_FUNCTION));
     add_load(REPR_CLASS, loader_cls.attr("load_global"), py::str(REPR_CLASS));

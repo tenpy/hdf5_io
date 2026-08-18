@@ -24,12 +24,11 @@ bind_hdf5_io(py::module_& m)
     auto& format_err =
       py::register_exception<Hdf5FormatError>(m, "Hdf5FormatError", PyExc_Exception);
     format_err.doc() = "Common base class for errors regarding our HDF5 format.";
-    auto& export_err =
-      py::register_exception<Hdf5ExportError>(m, "Hdf5ExportError", format_err);
+    auto& export_err = py::register_exception<Hdf5ExportError>(m, "Hdf5ExportError", format_err);
     export_err.doc() = "This exception is raised when something went wrong during export to hdf5.";
-    auto& import_err =
-      py::register_exception<Hdf5ImportError>(m, "Hdf5ImportError", format_err);
-    import_err.doc() = "This exception is raised when something went wrong during import from hdf5.";
+    auto& import_err = py::register_exception<Hdf5ImportError>(m, "Hdf5ImportError", format_err);
+    import_err.doc() =
+      "This exception is raised when something went wrong during import from hdf5.";
 
     m.attr("REPR_IGNORED") = REPR_IGNORED;
     m.attr("REPR_HDF5EXPORTABLE") = REPR_HDF5EXPORTABLE;
@@ -115,10 +114,7 @@ bind_hdf5_io(py::module_& m)
            py::arg("subpath"))
       .def_static(
         "from_hdf5",
-        [](py::handle cls,
-           py::object hdf5_loader,
-           py::object h5gr,
-           std::string subpath) {
+        [](py::handle cls, py::object hdf5_loader, py::object h5gr, std::string subpath) {
             return Hdf5Exportable::from_hdf5(
               cls.cast<py::type>(), std::move(hdf5_loader), std::move(h5gr), std::move(subpath));
         },
@@ -139,10 +135,8 @@ bind_hdf5_io(py::module_& m)
       .def_readwrite("memo_save", &Hdf5Saver::memo_save)
       .def_readwrite("format_selection", &Hdf5Saver::format_selection)
       .def("save", &Hdf5Saver::save, py::arg("obj"), py::arg("path") = "/")
-      .def("create_group_for_obj",
-           &Hdf5Saver::create_group_for_obj,
-           py::arg("path"),
-           py::arg("obj"))
+      .def(
+        "create_group_for_obj", &Hdf5Saver::create_group_for_obj, py::arg("path"), py::arg("obj"))
       .def("memorize_save", &Hdf5Saver::memorize_save, py::arg("h5gr"), py::arg("obj"))
       .def("save_reduce",
            &Hdf5Saver::save_reduce,
@@ -154,7 +148,8 @@ bind_hdf5_io(py::module_& m)
            py::arg("state_setter") = py::none(),
            py::arg("obj") = py::none(),
            py::arg("path") = py::none())
-      .def("save_none", &Hdf5Saver::save_none, py::arg("obj"), py::arg("path"), py::arg("type_repr"))
+      .def(
+        "save_none", &Hdf5Saver::save_none, py::arg("obj"), py::arg("path"), py::arg("type_repr"))
       .def("save_dataset",
            &Hdf5Saver::save_dataset,
            py::arg("obj"),
@@ -175,7 +170,8 @@ bind_hdf5_io(py::module_& m)
            py::arg("obj"),
            py::arg("h5gr"),
            py::arg("subpath"))
-      .def("save_dict", &Hdf5Saver::save_dict, py::arg("obj"), py::arg("path"), py::arg("type_repr"))
+      .def(
+        "save_dict", &Hdf5Saver::save_dict, py::arg("obj"), py::arg("path"), py::arg("type_repr"))
       .def("save_dict_content",
            &Hdf5Saver::save_dict_content,
            py::arg("obj"),

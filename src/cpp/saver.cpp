@@ -90,7 +90,8 @@ Hdf5Saver::save(py::object obj, std::string path)
         py::object listitems = tup.size() > 3 ? tup[3] : py::none();
         py::object dictitems = tup.size() > 4 ? tup[4] : py::none();
         py::object state_setter = tup.size() > 5 ? tup[5] : py::none();
-        return save_reduce(func, args, state, listitems, dictitems, state_setter, obj, py::str(path));
+        return save_reduce(
+          func, args, state, listitems, dictitems, state_setter, obj, py::str(path));
     }
 
     throw Hdf5ExportError("Don't know how to save object of type " +
@@ -107,7 +108,7 @@ Hdf5Saver::create_group_for_obj(std::string const& path, py::object obj)
         gr = h5_create_group(h5group, path);
     std::string subpath = (!path.empty() && path.back() == '/') ? path : (path + "/");
     memorize_save(gr, obj);
-    return {gr, subpath};
+    return { gr, subpath };
 }
 
 void
@@ -315,8 +316,8 @@ Hdf5Saver::save_global(py::object obj, std::string const& path, std::string cons
     try {
         obj2 = find_global(module, qualname);
     } catch (py::error_already_set const&) {
-        throw Hdf5ExportError("Can't export object: it's not found as " + qualname + " in module " +
-                              module);
+        throw Hdf5ExportError("Can't export object: it's not found as " + qualname +
+                              " in module " + module);
     }
     if (!obj2.is(obj))
         throw Hdf5ExportError("Can't export object: it's not the same object as " + qualname +

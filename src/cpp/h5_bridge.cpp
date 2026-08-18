@@ -1,5 +1,5 @@
-#include <hdf5_io/h5_bridge.h>
 #include <hdf5_io/exceptions.h>
+#include <hdf5_io/h5_bridge.h>
 
 #include <hdf5.h>
 #include <highfive/highfive.hpp>
@@ -17,18 +17,21 @@ namespace hdf5_io {
 
 namespace {
 
-py::module_ h5py_mod()
+py::module_
+h5py_mod()
 {
     return py::module_::import("h5py");
 }
 
-void check_hdf5(herr_t status, char const* what)
+void
+check_hdf5(herr_t status, char const* what)
 {
     if (status < 0)
         throw Hdf5ExportError(std::string("HDF5 error: ") + what);
 }
 
-HighFive::DataSpace numpy_space(py::array const& arr)
+HighFive::DataSpace
+numpy_space(py::array const& arr)
 {
     if (arr.ndim() == 0)
         return HighFive::DataSpace(HighFive::DataSpace::DataspaceType::dataspace_scalar);
@@ -38,7 +41,8 @@ HighFive::DataSpace numpy_space(py::array const& arr)
     return HighFive::DataSpace(dims);
 }
 
-py::array as_c_contiguous(py::array arr)
+py::array
+as_c_contiguous(py::array arr)
 {
     if (arr.attr("flags").attr("c_contiguous").cast<bool>())
         return arr;
@@ -46,7 +50,8 @@ py::array as_c_contiguous(py::array arr)
 }
 
 template<typename T>
-void write_typed_array(HighFive::Group& group, std::string const& path, py::array arr)
+void
+write_typed_array(HighFive::Group& group, std::string const& path, py::array arr)
 {
     arr = as_c_contiguous(arr);
     auto space = numpy_space(arr);
@@ -55,7 +60,8 @@ void write_typed_array(HighFive::Group& group, std::string const& path, py::arra
         dset.write_raw(static_cast<T const*>(arr.data()));
 }
 
-void write_numpy_array(HighFive::Group& group, std::string const& path, py::array arr)
+void
+write_numpy_array(HighFive::Group& group, std::string const& path, py::array arr)
 {
     py::dtype dt = arr.dtype();
     char kind = dt.kind();
@@ -92,15 +98,15 @@ void write_numpy_array(HighFive::Group& group, std::string const& path, py::arra
                           py::str(py::object(dt)).cast<std::string>());
 }
 
-void write_vlen_string(hid_t loc, std::string const& path, std::string const& value, bool utf8)
+void
+write_vlen_string(hid_t loc, std::string const& path, std::string const& value, bool utf8)
 {
     hid_t type = H5Tcopy(H5T_C_S1);
     check_hdf5(H5Tset_size(type, H5T_VARIABLE), "H5Tset_size");
     check_hdf5(H5Tset_cset(type, utf8 ? H5T_CSET_UTF8 : H5T_CSET_ASCII), "H5Tset_cset");
     check_hdf5(H5Tset_strpad(type, H5T_STR_NULLTERM), "H5Tset_strpad");
     hid_t space = H5Screate(H5S_SCALAR);
-    hid_t dset = H5Dcreate2(
-      loc, path.c_str(), type, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    hid_t dset = H5Dcreate2(loc, path.c_str(), type, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     if (dset < 0) {
         H5Sclose(space);
         H5Tclose(type);
@@ -114,7 +120,8 @@ void write_vlen_string(hid_t loc, std::string const& path, std::string const& va
     check_hdf5(st, "H5Dwrite string");
 }
 
-void write_vlen_bytes(hid_t loc, std::string const& path, py::bytes value)
+void
+write_vlen_bytes(hid_t loc, std::string const& path, py::bytes value)
 {
     char* buf = nullptr;
     py::ssize_t len = 0;
@@ -125,14 +132,16 @@ void write_vlen_bytes(hid_t loc, std::string const& path, py::bytes value)
 }
 
 template<typename T>
-void write_scalar(HighFive::Group& group, std::string const& path, T const& value)
+void
+write_scalar(HighFive::Group& group, std::string const& path, T const& value)
 {
     auto space = HighFive::DataSpace(HighFive::DataSpace::DataspaceType::dataspace_scalar);
     auto dset = group.createDataSet(path, space, HighFive::create_datatype<T>());
     dset.write_raw(&value);
 }
 
-void write_attr_vlen_string(hid_t loc, std::string const& name, std::string const& value, bool utf8)
+void
+write_attr_vlen_string(hid_t loc, std::string const& name, std::string const& value, bool utf8)
 {
     if (H5Aexists(loc, name.c_str()) > 0)
         check_hdf5(H5Adelete(loc, name.c_str()), "H5Adelete");
