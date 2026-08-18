@@ -1,0 +1,17 @@
+[flake8]
+require-plugins = flake8-rst-docstrings
+select = RST
+ignore = RST210,RST213,RST306
+
+rst-roles =
+    class,mod,meth,func,attr,data
+    py:func,
+    arxiv,cite,doi,
+    doc,ref,
+rst-directives =
+    autodata,autosummary,
+    todo,versionchanged,deprecated,
+    plot,
+    doctest,testsetup,
+exclude =
+    tests,

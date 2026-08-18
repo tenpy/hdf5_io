@@ -1,11 +1,7 @@
 """Tests for the C++ hdf5_io package."""
 
 import importlib.util
-import os
-import sys
-import tempfile
 import types
-import warnings
 from pathlib import Path
 
 import h5py
@@ -15,12 +11,12 @@ import pytest
 import hdf5_io
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PYTHON3_REF = REPO_ROOT / "src" / "python3" / "hdf5_io.py"
+PYTHON3_REF = REPO_ROOT / 'src' / 'python3' / 'hdf5_io.py'
 
 
 def load_reference_python_module():
     """Load the original reference implementation without installing it."""
-    spec = importlib.util.spec_from_file_location("hdf5_io_reference", PYTHON3_REF)
+    spec = importlib.util.spec_from_file_location('hdf5_io_reference', PYTHON3_REF)
     mod = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(mod)
@@ -43,8 +39,7 @@ class DummyClass(hdf5_io.Hdf5Exportable):
 def gen_example_data():
     data = {
         'None': None,
-        'scalars': [0, np.int64(1), 2.0, np.float64(3.0), 4.0j, 'five', True, 2**70,
-                    b'a byte string'],
+        'scalars': [0, np.int64(1), 2.0, np.float64(3.0), 4.0j, 'five', True, 2**70, b'a byte string'],
         'arrays': [np.array([6, 66]), np.array([]), np.zeros([]), np.array([True, False])],
         'masked_arrays': [
             np.ma.masked_equal([[1, -1, 3], [-1, 5, 6]], -1),
@@ -96,13 +91,15 @@ def assert_equal_data(data_imported, data_expected, max_recursion_depth=10):
 def test_hdf5_export_import_cpp(tmp_path):
     data = gen_example_data()
     dc = DummyClass()
-    data.update({
-        'global_function': dummy_function,
-        'global_class': DummyClass,
-        'instance': dc,
-        'method': dc.dummy_method,
-        'excluded_from_load': np.arange(3.0),
-    })
+    data.update(
+        {
+            'global_function': dummy_function,
+            'global_class': DummyClass,
+            'instance': dc,
+            'method': dc.dummy_method,
+            'excluded_from_load': np.arange(3.0),
+        }
+    )
     data_with_ignore = data.copy()
     data_with_ignore['ignore_save'] = hdf5_io.Hdf5Ignored()
     filename = tmp_path / 'test.hdf5'
@@ -111,9 +108,7 @@ def test_hdf5_export_import_cpp(tmp_path):
         f['ignore_load'] = 'ignore_during_load'
         f['ignore_load'].attrs[hdf5_io.ATTR_TYPE] = hdf5_io.REPR_IGNORED
     with h5py.File(filename, 'r') as f:
-        data_imported = hdf5_io.load_from_hdf5(
-            f, ignore_unknown=False, exclude=['/excluded_from_load']
-        )
+        data_imported = hdf5_io.load_from_hdf5(f, ignore_unknown=False, exclude=['/excluded_from_load'])
     assert isinstance(data_imported['ignore_load'], hdf5_io.Hdf5Ignored)
     del data_imported['ignore_load']
     assert isinstance(data_imported['excluded_from_load'], hdf5_io.Hdf5Ignored)
