@@ -11,3 +11,8 @@ data
 *.egg-info
 __pycache__
 playground
+build
+dist
+.venv
+.pytest_cache
+compile_commands.json

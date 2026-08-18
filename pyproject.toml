@@ -1,0 +1,47 @@
+[project]
+name = "hdf5_io"
+version = "0.1.0"
+description = "Import and export of general Python objects to HDF5 (TeNPy format)"
+readme = {file = "README.rst", content-type = "text/x-rst"}
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+license = {text = "GPL-3.0-or-later"}
+keywords = ["hdf5", "h5py", "serialization"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "numpy",
+    "h5py",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=6.0"]
+
+[project.urls]
+"Homepage" = "https://github.com/tenpy/hdf5_io"
+"Source" = "https://github.com/tenpy/hdf5_io"
+
+[build-system]
+requires = ["scikit-build-core", "pybind11", "numpy>=2.0"]
+build-backend = "scikit_build_core.build"
+
+[tool.scikit-build]
+cmake.version = ">=3.15"
+build-dir = "build"
+cmake.build-type = "Debug"
+wheel.packages = ["hdf5_io"]
+
+[tool.scikit-build.cmake.define]
+BUILD_TESTING = {env = "BUILD_TESTING", default = "ON"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    "error",
+]
