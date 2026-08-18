@@ -14,10 +14,10 @@ self_obj(Hdf5Loader* self)
     return py::cast(self, py::return_value_policy::reference);
 }
 
-py::object
+std::string
 h5_id(py::handle h5gr)
 {
-    return h5gr.attr("id");
+    return object_token(h5gr);
 }
 
 } // namespace
@@ -25,7 +25,7 @@ h5_id(py::handle h5gr)
 Hdf5Loader::Hdf5Loader(py::object h5group_, bool ignore_unknown_, py::object exclude)
   : h5group(std::move(h5group_))
   , ignore_unknown(ignore_unknown_)
-  , memo_load(py::dict())
+  , native_group(wrap_group(h5group))
 {
     if (exclude.is_none())
         return;
@@ -43,6 +43,15 @@ Hdf5Loader::Hdf5Loader(py::object h5group_, bool ignore_unknown_, py::object exc
                               .attr("format")(path));
         }
     }
+}
+
+py::dict
+Hdf5Loader::memo_load() const
+{
+    py::dict out;
+    for (auto const& [token, obj] : memo_load_objects)
+        out[py::str(token)] = obj;
+    return out;
 }
 
 py::dict
@@ -65,9 +74,10 @@ Hdf5Loader::load(py::object path)
     }
     std::string subpath =
       (!path_str.empty() && path_str.back() == '/') ? path_str : (path_str + "/");
-    py::object in_memo = memo_load.attr("get")(h5_id(h5gr));
-    if (!in_memo.is_none())
-        return in_memo;
+    auto key = h5_id(h5gr);
+    auto in_memo = memo_load_objects.find(key);
+    if (in_memo != memo_load_objects.end())
+        return in_memo->second;
 
     py::object type_repr = get_attr(h5gr, ATTR_TYPE);
     py::object disp = dispatch_load().attr("get")(type_repr);
@@ -84,9 +94,7 @@ Hdf5Loader::load(py::object path)
 void
 Hdf5Loader::memorize_load(py::object h5gr, py::object obj)
 {
-    py::object key = h5_id(h5gr);
-    if (!memo_load.contains(key))
-        memo_load[key] = obj;
+    memo_load_objects.try_emplace(h5_id(h5gr), std::move(obj));
 }
 
 py::object
@@ -229,7 +237,7 @@ Hdf5Loader::load_tuple(py::object h5gr, py::object type_info, std::string const&
     for (py::ssize_t i = 0; i < length; ++i)
         obj.append(load(py::str(subpath + std::to_string(i))));
     py::tuple tup(obj);
-    memo_load[h5_id(h5gr)] = tup;
+    memo_load_objects[h5_id(h5gr)] = tup;
     return tup;
 }
 

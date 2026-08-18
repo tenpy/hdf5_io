@@ -2,8 +2,10 @@
 
 #include <hdf5_io/constants.h>
 #include <hdf5_io/exceptions.h>
+#include <highfive/highfive.hpp>
 #include <pybind11/pybind11.h>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 namespace hdf5_io {
@@ -41,10 +43,11 @@ class Hdf5Saver
 {
   public:
     py::object h5group;
-    py::dict memo_save;
     py::dict format_selection;
 
     explicit Hdf5Saver(py::object h5group, py::object format_selection = py::none());
+
+    py::dict memo_save() const;
 
     py::object save(py::object obj, std::string path = "/");
     std::pair<py::object, std::string> create_group_for_obj(std::string const& path,
@@ -77,6 +80,8 @@ class Hdf5Saver
     py::object save_global(py::object obj, std::string const& path, std::string const& type_repr);
 
   private:
+    HighFive::Group native_group;
+    std::unordered_map<std::uint64_t, std::string> memo_save_paths;
     py::dict dispatch_save() const;
 };
 
@@ -85,11 +90,12 @@ class Hdf5Loader
   public:
     py::object h5group;
     bool ignore_unknown = true;
-    py::dict memo_load;
 
     explicit Hdf5Loader(py::object h5group,
                         bool ignore_unknown = true,
                         py::object exclude = py::none());
+
+    py::dict memo_load() const;
 
     py::object load(py::object path = py::none());
     void memorize_load(py::object h5gr, py::object obj);
@@ -123,6 +129,8 @@ class Hdf5Loader
     py::object load_reduce(py::object h5gr, py::object type_info, std::string const& subpath);
 
   private:
+    HighFive::Group native_group;
+    std::unordered_map<std::string, py::object> memo_load_objects;
     py::dict dispatch_load() const;
 };
 

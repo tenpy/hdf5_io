@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <highfive/highfive.hpp>
+#include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <string>
 
@@ -20,6 +22,10 @@ bool is_h5py_dataset(py::handle obj);
 /// Borrow an h5py File/Group as a HighFive Group (increments the HDF5 refcount).
 HighFive::Group wrap_group(py::handle obj);
 
+/// Native object identity token for memoization across reopened handles and hard links.
+std::string object_token(hid_t hid);
+std::string object_token(py::handle obj);
+
 /// Wrap an existing HDF5 object id back into an h5py Group or Dataset.
 py::object h5py_from_hid(hid_t hid);
 
@@ -28,15 +34,28 @@ py::object h5py_getitem(py::handle parent, std::string const& path);
 
 /// Create a subgroup via HighFive and return the h5py Group.
 py::object h5_create_group(py::handle parent, std::string const& path);
+HighFive::Group h5_create_group(HighFive::Group& parent, std::string const& path);
 
 /// Create a hard link ``parent[path] = src`` (src is an existing h5py Group/Dataset).
 void h5_hard_link(py::handle parent, std::string const& path, py::handle src);
+void h5_hard_link(HighFive::Group& parent, std::string const& path, hid_t src);
 
 /// Write ``parent[path] = obj`` as a dataset (numpy/scalars/str/bytes).
 void h5_write_dataset(py::handle parent, std::string const& path, py::handle obj);
+void h5_write_dataset(HighFive::Group& parent, std::string const& path, py::array const& obj);
+void h5_write_dataset(HighFive::Group& parent, std::string const& path, std::string const& obj);
+void h5_write_dataset(HighFive::Group& parent, std::string const& path, py::bytes const& obj);
+void h5_write_dataset(HighFive::Group& parent, std::string const& path, std::int64_t obj);
+void h5_write_dataset(HighFive::Group& parent, std::string const& path, std::uint64_t obj);
+void h5_write_dataset(HighFive::Group& parent, std::string const& path, double obj);
+void h5_write_dataset(HighFive::Group& parent,
+                      std::string const& path,
+                      std::complex<double> const& obj);
+void h5_write_dataset(HighFive::Group& parent, std::string const& path, bool obj);
 
 /// Create a hard link or dataset, matching h5py ``parent[path] = obj``.
 void h5_set_item(py::handle parent, std::string const& path, py::handle obj);
+void h5_set_item(HighFive::Group& parent, std::string const& path, hid_t src);
 
 /// Set or overwrite an HDF5 attribute (string/int/float/bool/numpy scalar or array).
 void h5_set_attr(py::handle h5obj, std::string const& name, py::handle value);

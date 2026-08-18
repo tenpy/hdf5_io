@@ -8,7 +8,9 @@
 
 #include <complex>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -28,6 +30,14 @@ check_hdf5(herr_t status, char const* what)
 {
     if (status < 0)
         throw Hdf5ExportError(std::string("HDF5 error: ") + what);
+}
+
+std::string
+normalized_path(std::string const& path)
+{
+    if (path.size() > 1 && path.front() == '/')
+        return path.substr(1);
+    return path;
 }
 
 HighFive::DataSpace
@@ -211,6 +221,24 @@ wrap_group(py::handle obj)
     return HighFive::detail::make_group(hid);
 }
 
+std::string
+object_token(hid_t hid)
+{
+    H5O_info2_t info{};
+    check_hdf5(H5Oget_info3(hid, &info, H5O_INFO_BASIC), "H5Oget_info3");
+    char* token_cstr = nullptr;
+    check_hdf5(H5Otoken_to_str(hid, &info.token, &token_cstr), "H5Otoken_to_str");
+    std::string token(token_cstr);
+    check_hdf5(H5free_memory(token_cstr), "H5free_memory");
+    return token;
+}
+
+std::string
+object_token(py::handle obj)
+{
+    return object_token(hid_from_h5py(obj));
+}
+
 py::object
 h5py_from_hid(hid_t hid)
 {
@@ -244,62 +272,112 @@ py::object
 h5_create_group(py::handle parent, std::string const& path)
 {
     auto group = wrap_group(parent);
-    std::string p = path;
-    if (p.size() > 1 && p.front() == '/')
-        p = p.substr(1);
-    group.createGroup(p);
+    h5_create_group(group, path);
     return h5py_getitem(parent, path);
+}
+
+HighFive::Group
+h5_create_group(HighFive::Group& parent, std::string const& path)
+{
+    return parent.createGroup(normalized_path(path));
 }
 
 void
 h5_hard_link(py::handle parent, std::string const& path, py::handle src)
 {
-    hid_t dest = hid_from_h5py(parent);
-    hid_t src_id = hid_from_h5py(src);
-    std::string p = path;
-    herr_t st = H5Lcreate_hard(src_id, ".", dest, p.c_str(), H5P_DEFAULT, H5P_DEFAULT);
+    auto group = wrap_group(parent);
+    h5_hard_link(group, path, hid_from_h5py(src));
+}
+
+void
+h5_hard_link(HighFive::Group& parent, std::string const& path, hid_t src)
+{
+    herr_t st = H5Lcreate_hard(
+      src, ".", parent.getId(), normalized_path(path).c_str(), H5P_DEFAULT, H5P_DEFAULT);
     check_hdf5(st, "H5Lcreate_hard");
+}
+
+void
+h5_write_dataset(HighFive::Group& parent, std::string const& path, py::array const& obj)
+{
+    write_numpy_array(parent, normalized_path(path), obj);
+}
+
+void
+h5_write_dataset(HighFive::Group& parent, std::string const& path, std::string const& obj)
+{
+    write_vlen_string(parent.getId(), normalized_path(path), obj, true);
+}
+
+void
+h5_write_dataset(HighFive::Group& parent, std::string const& path, py::bytes const& obj)
+{
+    write_vlen_bytes(parent.getId(), normalized_path(path), obj);
+}
+
+void
+h5_write_dataset(HighFive::Group& parent, std::string const& path, std::int64_t obj)
+{
+    write_scalar<std::int64_t>(parent, normalized_path(path), obj);
+}
+
+void
+h5_write_dataset(HighFive::Group& parent, std::string const& path, std::uint64_t obj)
+{
+    write_scalar<std::uint64_t>(parent, normalized_path(path), obj);
+}
+
+void
+h5_write_dataset(HighFive::Group& parent, std::string const& path, double obj)
+{
+    write_scalar<double>(parent, normalized_path(path), obj);
+}
+
+void
+h5_write_dataset(HighFive::Group& parent, std::string const& path, std::complex<double> const& obj)
+{
+    write_scalar<std::complex<double>>(parent, normalized_path(path), obj);
+}
+
+void
+h5_write_dataset(HighFive::Group& parent, std::string const& path, bool obj)
+{
+    write_scalar<std::uint8_t>(parent, normalized_path(path), obj ? 1u : 0u);
 }
 
 void
 h5_write_dataset(py::handle parent, std::string const& path, py::handle obj)
 {
     auto group = wrap_group(parent);
-    std::string p = path;
-    if (p.size() > 1 && p.front() == '/')
-        p = p.substr(1);
-
     py::module_ np = py::module_::import("numpy");
     if (py::isinstance(obj, np.attr("ndarray")) &&
         !py::isinstance(obj, np.attr("ma").attr("MaskedArray"))) {
-        write_numpy_array(group, p, py::reinterpret_borrow<py::array>(obj));
+        h5_write_dataset(group, path, py::reinterpret_borrow<py::array>(obj));
         return;
     }
     if (py::isinstance<py::str>(obj)) {
-        write_vlen_string(group.getId(), p, obj.cast<std::string>(), true);
+        h5_write_dataset(group, path, obj.cast<std::string>());
         return;
     }
     if (py::isinstance<py::bytes>(obj)) {
-        write_vlen_bytes(group.getId(), p, py::reinterpret_borrow<py::bytes>(obj));
+        h5_write_dataset(group, path, py::reinterpret_borrow<py::bytes>(obj));
         return;
     }
     if (obj.ptr() == Py_True || obj.ptr() == Py_False) {
-        std::uint8_t v = PyObject_IsTrue(obj.ptr()) ? 1 : 0;
-        write_scalar<std::uint8_t>(group, p, v);
+        h5_write_dataset(group, path, PyObject_IsTrue(obj.ptr()) != 0);
         return;
     }
     if (py::isinstance<py::int_>(obj) && !py::isinstance(obj, np.attr("integer"))) {
-        py::int_ pyi = py::reinterpret_borrow<py::int_>(obj);
         int overflow = 0;
         long long v = PyLong_AsLongLongAndOverflow(obj.ptr(), &overflow);
         if (overflow == 0 && !PyErr_Occurred()) {
-            write_scalar<std::int64_t>(group, p, static_cast<std::int64_t>(v));
+            h5_write_dataset(group, path, static_cast<std::int64_t>(v));
             return;
         }
         PyErr_Clear();
         unsigned long long uv = PyLong_AsUnsignedLongLong(obj.ptr());
         if (!PyErr_Occurred()) {
-            write_scalar<std::uint64_t>(group, p, static_cast<std::uint64_t>(uv));
+            h5_write_dataset(group, path, static_cast<std::uint64_t>(uv));
             return;
         }
         PyErr_Clear();
@@ -307,18 +385,19 @@ h5_write_dataset(py::handle parent, std::string const& path, py::handle obj)
                              "and no native HDF5 equivalent");
     }
     if (py::isinstance<py::float_>(obj)) {
-        write_scalar<double>(group, p, obj.cast<double>());
+        h5_write_dataset(group, path, obj.cast<double>());
         return;
     }
     if (PyComplex_Check(obj.ptr())) {
-        std::complex<double> z(PyComplex_RealAsDouble(obj.ptr()),
-                               PyComplex_ImagAsDouble(obj.ptr()));
-        write_scalar<std::complex<double>>(group, p, z);
+        h5_write_dataset(group,
+                         path,
+                         std::complex<double>(PyComplex_RealAsDouble(obj.ptr()),
+                                              PyComplex_ImagAsDouble(obj.ptr())));
         return;
     }
     if (py::isinstance(obj, np.attr("generic"))) {
-        py::array arr = np.attr("asarray")(obj);
-        write_numpy_array(group, p, arr);
+        h5_write_dataset(
+          group, path, py::module_::import("numpy").attr("asarray")(obj).cast<py::array>());
         return;
     }
     throw Hdf5ExportError("don't know how to write dataset for object");
@@ -332,6 +411,12 @@ h5_set_item(py::handle parent, std::string const& path, py::handle obj)
         return;
     }
     h5_write_dataset(parent, path, obj);
+}
+
+void
+h5_set_item(HighFive::Group& parent, std::string const& path, hid_t src)
+{
+    h5_hard_link(parent, path, src);
 }
 
 void

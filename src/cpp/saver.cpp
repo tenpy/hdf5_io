@@ -4,16 +4,17 @@
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 
+#include <cstdint>
 #include <utility>
 
 namespace hdf5_io {
 
 namespace {
 
-py::object
+std::uint64_t
 py_id(py::handle obj)
 {
-    return py::module_::import("builtins").attr("id")(obj);
+    return py::module_::import("builtins").attr("id")(obj).cast<std::uint64_t>();
 }
 
 py::object
@@ -26,12 +27,21 @@ self_obj(Hdf5Saver* self)
 
 Hdf5Saver::Hdf5Saver(py::object h5group_, py::object format_selection_)
   : h5group(std::move(h5group_))
-  , memo_save(py::dict())
+  , native_group(wrap_group(h5group))
 {
     if (format_selection_.is_none())
         format_selection = py::dict();
     else
         format_selection = py::reinterpret_borrow<py::dict>(format_selection_);
+}
+
+py::dict
+Hdf5Saver::memo_save() const
+{
+    py::dict out;
+    for (auto const& [obj_id, path] : memo_save_paths)
+        out[py::int_(obj_id)] = py::str(path);
+    return out;
 }
 
 py::dict
@@ -43,12 +53,13 @@ Hdf5Saver::dispatch_save() const
 py::object
 Hdf5Saver::save(py::object obj, std::string path)
 {
-    py::object obj_id = py_id(obj);
-    py::object in_memo = memo_save.attr("get")(obj_id);
-    if (!in_memo.is_none()) {
-        py::object h5gr = in_memo[py::int_(0)];
-        h5_set_item(h5group, path, h5gr);
-        return h5gr;
+    std::uint64_t obj_id = py_id(obj);
+    auto in_memo = memo_save_paths.find(obj_id);
+    if (in_memo != memo_save_paths.end()) {
+        py::object existing = h5group.attr("file")[py::str(in_memo->second)];
+        hid_t src_hid = hid_from_h5py(existing);
+        h5_set_item(native_group, path, src_hid);
+        return h5py_getitem(h5group, path);
     }
 
     py::object disp = dispatch_save().attr("get")(py::type::of(obj));
@@ -105,7 +116,7 @@ Hdf5Saver::create_group_for_obj(std::string const& path, py::object obj)
     if (path == "/")
         gr = h5group[py::str(path)];
     else
-        gr = h5_create_group(h5group, path);
+        gr = h5py_from_hid(h5_create_group(native_group, path).getId());
     std::string subpath = (!path.empty() && path.back() == '/') ? path : (path + "/");
     memorize_save(gr, obj);
     return { gr, subpath };
@@ -114,10 +125,10 @@ Hdf5Saver::create_group_for_obj(std::string const& path, py::object obj)
 void
 Hdf5Saver::memorize_save(py::object h5gr, py::object obj)
 {
-    py::object obj_id = py_id(obj);
-    if (memo_save.contains(obj_id))
+    std::uint64_t obj_id = py_id(obj);
+    if (memo_save_paths.contains(obj_id))
         throw Hdf5ExportError("object already memorized");
-    memo_save[obj_id] = py::make_tuple(h5gr, obj);
+    memo_save_paths.emplace(obj_id, h5gr.attr("name").cast<std::string>());
 }
 
 py::object
@@ -150,7 +161,7 @@ py::object
 Hdf5Saver::save_none(py::object obj, std::string const& path, std::string const& type_repr)
 {
     (void)type_repr;
-    h5_write_dataset(h5group, path, py::str(REPR_NONE));
+    h5_write_dataset(native_group, path, std::string(REPR_NONE));
     py::object h5gr = h5py_getitem(h5group, path);
     h5_set_attr(h5gr, ATTR_TYPE, py::str(REPR_NONE));
     memorize_save(h5gr, obj);
@@ -160,8 +171,43 @@ Hdf5Saver::save_none(py::object obj, std::string const& path, std::string const&
 py::object
 Hdf5Saver::save_dataset(py::object obj, std::string const& path, std::string type_repr)
 {
+    py::module_ np = py::module_::import("numpy");
     try {
-        h5_write_dataset(h5group, path, obj);
+        if (py::isinstance(obj, np.attr("ndarray")) &&
+            !py::isinstance(obj, np.attr("ma").attr("MaskedArray")))
+            h5_write_dataset(native_group, path, py::reinterpret_borrow<py::array>(obj));
+        else if (py::isinstance<py::str>(obj))
+            h5_write_dataset(native_group, path, obj.cast<std::string>());
+        else if (py::isinstance<py::bytes>(obj))
+            h5_write_dataset(native_group, path, py::reinterpret_borrow<py::bytes>(obj));
+        else if (obj.ptr() == Py_True || obj.ptr() == Py_False)
+            h5_write_dataset(native_group, path, PyObject_IsTrue(obj.ptr()) != 0);
+        else if (py::isinstance<py::int_>(obj) && !py::isinstance(obj, np.attr("integer"))) {
+            int overflow = 0;
+            long long v = PyLong_AsLongLongAndOverflow(obj.ptr(), &overflow);
+            if (overflow == 0 && !PyErr_Occurred())
+                h5_write_dataset(native_group, path, static_cast<std::int64_t>(v));
+            else {
+                PyErr_Clear();
+                unsigned long long uv = PyLong_AsUnsignedLongLong(obj.ptr());
+                if (PyErr_Occurred()) {
+                    PyErr_Clear();
+                    throw py::type_error(
+                      "No conversion path for dtype: dtype('O') and no native HDF5 equivalent");
+                }
+                h5_write_dataset(native_group, path, static_cast<std::uint64_t>(uv));
+            }
+        } else if (py::isinstance<py::float_>(obj))
+            h5_write_dataset(native_group, path, obj.cast<double>());
+        else if (PyComplex_Check(obj.ptr()))
+            h5_write_dataset(native_group,
+                             path,
+                             std::complex<double>(PyComplex_RealAsDouble(obj.ptr()),
+                                                  PyComplex_ImagAsDouble(obj.ptr())));
+        else if (py::isinstance(obj, np.attr("generic")))
+            h5_write_dataset(native_group, path, np.attr("asarray")(obj).cast<py::array>());
+        else
+            throw Hdf5ExportError("don't know how to write dataset for object");
     } catch (py::error_already_set& e) {
         if (type_repr != REPR_INT || !e.matches(PyExc_TypeError))
             throw;
@@ -170,21 +216,21 @@ Hdf5Saver::save_dataset(py::object obj, std::string const& path, std::string typ
             throw;
         obj = py::str(obj);
         type_repr = REPR_INT_AS_STR;
-        h5_write_dataset(h5group, path, obj);
+        h5_write_dataset(native_group, path, obj.cast<std::string>());
     } catch (Hdf5ExportError const& e) {
         if (type_repr != REPR_INT ||
             std::string(e.what()).find("no native HDF5 equivalent") == std::string::npos)
             throw;
         obj = py::str(obj);
         type_repr = REPR_INT_AS_STR;
-        h5_write_dataset(h5group, path, obj);
+        h5_write_dataset(native_group, path, obj.cast<std::string>());
     } catch (py::type_error const& e) {
         if (type_repr != REPR_INT ||
             std::string(e.what()).find("no native HDF5 equivalent") == std::string::npos)
             throw;
         obj = py::str(obj);
         type_repr = REPR_INT_AS_STR;
-        h5_write_dataset(h5group, path, obj);
+        h5_write_dataset(native_group, path, obj.cast<std::string>());
     }
     py::object h5gr = h5py_getitem(h5group, path);
     h5_set_attr(h5gr, ATTR_TYPE, py::str(type_repr));
@@ -206,11 +252,17 @@ Hdf5Saver::save_masked_array(py::object obj, std::string const& path, std::strin
         auto created = create_group_for_obj(path, obj);
         h5gr = created.first;
         std::string subpath = created.second;
-        h5_write_dataset(h5gr, "data", obj.attr("data"));
-        h5_write_dataset(h5gr, "mask", obj.attr("mask"));
+        auto native_h5gr = wrap_group(h5gr);
+        h5_write_dataset(native_h5gr, "data", obj.attr("data").cast<py::array>());
+        h5_write_dataset(native_h5gr, "mask", obj.attr("mask").cast<py::array>());
         h5_set_attr(h5gr, "saved_mask", py::bool_(true));
     } else {
-        h5_write_dataset(h5group, path, filled);
+        if (py::isinstance<py::str>(filled))
+            h5_write_dataset(native_group, path, filled.cast<std::string>());
+        else if (py::isinstance<py::bytes>(filled))
+            h5_write_dataset(native_group, path, py::reinterpret_borrow<py::bytes>(filled));
+        else
+            h5_write_dataset(native_group, path, filled.cast<py::array>());
         h5gr = h5py_getitem(h5group, path);
         h5_set_attr(h5gr, "saved_mask", py::bool_(false));
         memorize_save(h5gr, obj);
@@ -323,7 +375,7 @@ Hdf5Saver::save_global(py::object obj, std::string const& path, std::string cons
         throw Hdf5ExportError("Can't export object: it's not the same object as " + qualname +
                               " in module " + module);
     std::string full_name = qualname + " in " + module;
-    h5_write_dataset(h5group, path, py::str(full_name));
+    h5_write_dataset(native_group, path, full_name);
     py::object h5gr = h5py_getitem(h5group, path);
     h5_set_attr(h5gr, ATTR_TYPE, py::str(type_repr));
     h5_set_attr(h5gr, ATTR_CLASS, py::str(qualname));
