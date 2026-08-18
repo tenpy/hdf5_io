@@ -1,5 +1,8 @@
 #include "py_hdf5_io.h"
 
+#include <hdf5.h>
+#include <hdf5_io/h5_bridge.h>
+
 #include <pybind11/operators.h>
 #include <pybind11/stl.h>
 
@@ -111,21 +114,32 @@ bind_hdf5_io(py::module_& m)
            &Hdf5Exportable::save_hdf5,
            py::arg("hdf5_saver"),
            py::arg("h5gr"),
-           py::arg("subpath"))
-      .def_static(
-        "from_hdf5",
-        [](py::handle cls, py::object hdf5_loader, py::object h5gr, std::string subpath) {
-            return Hdf5Exportable::from_hdf5(
-              cls.cast<py::type>(), std::move(hdf5_loader), std::move(h5gr), std::move(subpath));
-        },
-        py::is_method(exportable),
-        py::arg("hdf5_loader"),
-        py::arg("h5gr"),
-        py::arg("subpath"));
+           py::arg("subpath"));
+    exportable.attr("from_hdf5") = py::module_::import("builtins").attr("classmethod")(py::cpp_function(
+      [](py::type cls, py::object hdf5_loader, py::object h5gr, std::string subpath) {
+          return Hdf5Exportable::from_hdf5(
+            cls, std::move(hdf5_loader), std::move(h5gr), std::move(subpath));
+      },
+      py::name("from_hdf5"),
+      py::arg("cls"),
+      py::arg("hdf5_loader"),
+      py::arg("h5gr"),
+      py::arg("subpath")));
 
     py::class_<Hdf5Ignored>(m, "Hdf5Ignored")
       .def(py::init<std::string>(), py::arg("name") = "unknown")
       .def_readwrite("name", &Hdf5Ignored::name);
+
+    auto hid_to_py = [](hid_t id) -> py::object {
+        if (id < 0)
+            return py::none();
+        py::object obj = h5py_from_hid(id);
+        H5Idec_ref(id);
+        return obj;
+    };
+    auto type_info_str = [](py::object type_info) {
+        return type_info.is_none() ? std::string() : py::str(type_info).cast<std::string>();
+    };
 
     py::class_<Hdf5Saver>(m, "Hdf5Saver")
       .def(py::init<py::object, py::object>(),
@@ -136,8 +150,17 @@ bind_hdf5_io(py::module_& m)
       .def_readwrite("format_selection", &Hdf5Saver::format_selection)
       .def("save", &Hdf5Saver::save, py::arg("obj"), py::arg("path") = "/")
       .def(
-        "create_group_for_obj", &Hdf5Saver::create_group_for_obj, py::arg("path"), py::arg("obj"))
-      .def("memorize_save", &Hdf5Saver::memorize_save, py::arg("h5gr"), py::arg("obj"))
+        "create_group_for_obj",
+        [](Hdf5Saver& self, std::string path, py::object obj) {
+            auto [group, subpath] = self.create_group_for_obj(path, std::move(obj));
+            return py::make_tuple(h5py_from_hid(group.getId()), py::str(subpath));
+        },
+        py::arg("path"),
+        py::arg("obj"))
+      .def("memorize_save",
+           static_cast<void (Hdf5Saver::*)(py::object, py::object)>(&Hdf5Saver::memorize_save),
+           py::arg("h5gr"),
+           py::arg("obj"))
       .def("save_reduce",
            &Hdf5Saver::save_reduce,
            py::arg("func"),
@@ -149,54 +172,95 @@ bind_hdf5_io(py::module_& m)
            py::arg("obj") = py::none(),
            py::arg("path") = py::none())
       .def(
-        "save_none", &Hdf5Saver::save_none, py::arg("obj"), py::arg("path"), py::arg("type_repr"))
-      .def("save_dataset",
-           &Hdf5Saver::save_dataset,
-           py::arg("obj"),
-           py::arg("path"),
-           py::arg("type_repr"))
-      .def("save_masked_array",
-           &Hdf5Saver::save_masked_array,
-           py::arg("obj"),
-           py::arg("path"),
-           py::arg("type_repr"))
-      .def("save_iterable",
-           &Hdf5Saver::save_iterable,
-           py::arg("obj"),
-           py::arg("path"),
-           py::arg("type_repr"))
-      .def("save_iterable_content",
-           &Hdf5Saver::save_iterable_content,
-           py::arg("obj"),
-           py::arg("h5gr"),
-           py::arg("subpath"))
+        "save_none",
+        [hid_to_py](Hdf5Saver& self, py::object obj, std::string path, std::string type_repr) {
+            return hid_to_py(self.save_none(std::move(obj), path, type_repr));
+        },
+        py::arg("obj"),
+        py::arg("path"),
+        py::arg("type_repr"))
       .def(
-        "save_dict", &Hdf5Saver::save_dict, py::arg("obj"), py::arg("path"), py::arg("type_repr"))
-      .def("save_dict_content",
-           &Hdf5Saver::save_dict_content,
-           py::arg("obj"),
-           py::arg("h5gr"),
-           py::arg("subpath"))
-      .def("save_range",
-           &Hdf5Saver::save_range,
-           py::arg("obj"),
-           py::arg("path"),
-           py::arg("type_repr"))
-      .def("save_dtype",
-           &Hdf5Saver::save_dtype,
-           py::arg("obj"),
-           py::arg("path"),
-           py::arg("type_repr"))
-      .def("save_ignored",
-           &Hdf5Saver::save_ignored,
-           py::arg("obj"),
-           py::arg("path"),
-           py::arg("type_repr"))
-      .def("save_global",
-           &Hdf5Saver::save_global,
-           py::arg("obj"),
-           py::arg("path"),
-           py::arg("type_repr"));
+        "save_dataset",
+        [hid_to_py](Hdf5Saver& self, py::object obj, std::string path, std::string type_repr) {
+            return hid_to_py(self.save_dataset(std::move(obj), path, type_repr));
+        },
+        py::arg("obj"),
+        py::arg("path"),
+        py::arg("type_repr"))
+      .def(
+        "save_masked_array",
+        [hid_to_py](Hdf5Saver& self, py::object obj, std::string path, std::string type_repr) {
+            return hid_to_py(self.save_masked_array(std::move(obj), path, type_repr));
+        },
+        py::arg("obj"),
+        py::arg("path"),
+        py::arg("type_repr"))
+      .def(
+        "save_iterable",
+        [hid_to_py](Hdf5Saver& self, py::object obj, std::string path, std::string type_repr) {
+            return hid_to_py(self.save_iterable(std::move(obj), path, type_repr));
+        },
+        py::arg("obj"),
+        py::arg("path"),
+        py::arg("type_repr"))
+      .def(
+        "save_iterable_content",
+        [](Hdf5Saver& self, py::object obj, py::object h5gr, std::string subpath) {
+            auto group = wrap_group(h5gr);
+            self.save_iterable_content(std::move(obj), group, subpath);
+        },
+        py::arg("obj"),
+        py::arg("h5gr"),
+        py::arg("subpath"))
+      .def(
+        "save_dict",
+        [hid_to_py](Hdf5Saver& self, py::object obj, std::string path, std::string type_repr) {
+            return hid_to_py(self.save_dict(std::move(obj), path, type_repr));
+        },
+        py::arg("obj"),
+        py::arg("path"),
+        py::arg("type_repr"))
+      .def(
+        "save_dict_content",
+        [](Hdf5Saver& self, py::object obj, py::object h5gr, std::string subpath) {
+            auto group = wrap_group(h5gr);
+            return self.save_dict_content(std::move(obj), group, subpath);
+        },
+        py::arg("obj"),
+        py::arg("h5gr"),
+        py::arg("subpath"))
+      .def(
+        "save_range",
+        [hid_to_py](Hdf5Saver& self, py::object obj, std::string path, std::string type_repr) {
+            return hid_to_py(self.save_range(std::move(obj), path, type_repr));
+        },
+        py::arg("obj"),
+        py::arg("path"),
+        py::arg("type_repr"))
+      .def(
+        "save_dtype",
+        [hid_to_py](Hdf5Saver& self, py::object obj, std::string path, std::string type_repr) {
+            return hid_to_py(self.save_dtype(std::move(obj), path, type_repr));
+        },
+        py::arg("obj"),
+        py::arg("path"),
+        py::arg("type_repr"))
+      .def(
+        "save_ignored",
+        [hid_to_py](Hdf5Saver& self, py::object obj, std::string path, std::string type_repr) {
+            return hid_to_py(self.save_ignored(std::move(obj), path, type_repr));
+        },
+        py::arg("obj"),
+        py::arg("path"),
+        py::arg("type_repr"))
+      .def(
+        "save_global",
+        [hid_to_py](Hdf5Saver& self, py::object obj, std::string path, std::string type_repr) {
+            return hid_to_py(self.save_global(std::move(obj), path, type_repr));
+        },
+        py::arg("obj"),
+        py::arg("path"),
+        py::arg("type_repr"));
 
     py::class_<Hdf5Loader>(m, "Hdf5Loader")
       .def(py::init<py::object, bool, py::object>(),
@@ -207,94 +271,168 @@ bind_hdf5_io(py::module_& m)
       .def_readwrite("ignore_unknown", &Hdf5Loader::ignore_unknown)
       .def_property_readonly("memo_load", &Hdf5Loader::memo_load)
       .def("load", &Hdf5Loader::load, py::arg("path") = py::none())
-      .def("memorize_load", &Hdf5Loader::memorize_load, py::arg("h5gr"), py::arg("obj"))
+      .def("memorize_load",
+           static_cast<void (Hdf5Loader::*)(py::object, py::object)>(&Hdf5Loader::memorize_load),
+           py::arg("h5gr"),
+           py::arg("obj"))
       .def("get_all_hdf5_keys", &Hdf5Loader::get_all_hdf5_keys, py::arg("h5_group") = py::none())
-      .def_static("get_attr", &Hdf5Loader::get_attr, py::arg("h5gr"), py::arg("attr_name"))
-      .def("load_none",
-           &Hdf5Loader::load_none,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_dataset",
-           &Hdf5Loader::load_dataset,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_str",
-           &Hdf5Loader::load_str,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_converted_to_str",
-           &Hdf5Loader::load_converted_to_str,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_masked_array",
-           &Hdf5Loader::load_masked_array,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_list",
-           &Hdf5Loader::load_list,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_set",
-           &Hdf5Loader::load_set,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_tuple",
-           &Hdf5Loader::load_tuple,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_dict",
-           &Hdf5Loader::load_dict,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_general_dict",
-           &Hdf5Loader::load_general_dict,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_simple_dict",
-           &Hdf5Loader::load_simple_dict,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_range",
-           &Hdf5Loader::load_range,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_dtype",
-           &Hdf5Loader::load_dtype,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_hdf5exportable",
-           &Hdf5Loader::load_hdf5exportable,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_ignored",
-           &Hdf5Loader::load_ignored,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_global",
-           &Hdf5Loader::load_global,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"))
-      .def("load_reduce",
-           &Hdf5Loader::load_reduce,
-           py::arg("h5gr"),
-           py::arg("type_info"),
-           py::arg("subpath"));
+      .def_static("get_attr",
+                  static_cast<py::object (*)(py::object, std::string const&)>(&Hdf5Loader::get_attr),
+                  py::arg("h5gr"),
+                  py::arg("attr_name"))
+      .def(
+        "load_none",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_none(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_dataset",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_dataset(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_str",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_str(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_converted_to_str",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_converted_to_str(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_masked_array",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_masked_array(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_list",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_list(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_set",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_set(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_tuple",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_tuple(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_dict",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_dict(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_general_dict",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_general_dict(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_simple_dict",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_simple_dict(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_range",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_range(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_dtype",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_dtype(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_hdf5exportable",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_hdf5exportable(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_ignored",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_ignored(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_global",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_global(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"))
+      .def(
+        "load_reduce",
+        [type_info_str](
+          Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
+            return self.load_reduce(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+        },
+        py::arg("h5gr"),
+        py::arg("type_info"),
+        py::arg("subpath"));
 
     m.def("save_to_hdf5",
           &save_to_hdf5,

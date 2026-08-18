@@ -11,10 +11,11 @@ Hdf5Ignored::Hdf5Ignored(std::string name_)
 void
 Hdf5Exportable::save_hdf5(py::object hdf5_saver, py::object h5gr, std::string subpath)
 {
+    Hdf5Saver& saver = hdf5_saver.cast<Hdf5Saver&>();
+    auto group = wrap_group(h5gr);
     py::object self = py::cast(this);
-    py::object type_repr =
-      hdf5_saver.attr("save_dict_content")(self.attr("__dict__"), h5gr, subpath);
-    h5_set_attr(h5gr, ATTR_FORMAT, type_repr);
+    std::string type_repr = saver.save_dict_content(self.attr("__dict__"), group, subpath);
+    h5_set_attr(hid_from_h5py(h5gr), ATTR_FORMAT, type_repr);
 }
 
 py::object
@@ -23,10 +24,12 @@ Hdf5Exportable::from_hdf5(py::type cls,
                           py::object h5gr,
                           std::string subpath)
 {
-    py::object dict_format = hdf5_loader.attr("get_attr")(h5gr, ATTR_FORMAT);
+    Hdf5Loader& loader = hdf5_loader.cast<Hdf5Loader&>();
+    hid_t hid = hid_from_h5py(h5gr);
+    std::string dict_format = py::str(loader.get_attr(hid, ATTR_FORMAT)).cast<std::string>();
     py::object obj = cls.attr("__new__")(cls);
-    hdf5_loader.attr("memorize_load")(h5gr, obj);
-    py::object data = hdf5_loader.attr("load_dict")(h5gr, dict_format, subpath);
+    loader.memorize_load(hid, obj);
+    py::object data = loader.load_dict(hid, dict_format, subpath);
     obj.attr("__dict__").attr("update")(data);
     return obj;
 }

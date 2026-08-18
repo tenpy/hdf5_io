@@ -4,9 +4,11 @@
 #include <hdf5_io/exceptions.h>
 #include <highfive/highfive.hpp>
 #include <pybind11/pybind11.h>
+#include <Python.h>
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace hdf5_io {
 
@@ -46,12 +48,19 @@ class Hdf5Saver
     py::dict format_selection;
 
     explicit Hdf5Saver(py::object h5group, py::object format_selection = py::none());
+    Hdf5Saver(Hdf5Saver const&) = delete;
+    Hdf5Saver& operator=(Hdf5Saver const&) = delete;
+    Hdf5Saver(Hdf5Saver&&) = delete;
+    Hdf5Saver& operator=(Hdf5Saver&&) = delete;
+    ~Hdf5Saver();
 
     py::dict memo_save() const;
 
     py::object save(py::object obj, std::string path = "/");
-    std::pair<py::object, std::string> create_group_for_obj(std::string const& path,
-                                                            py::object obj);
+    hid_t save_hid(py::object obj, std::string path = "/");
+    std::pair<HighFive::Group, std::string> create_group_for_obj(std::string const& path,
+                                                                 py::object obj);
+    void memorize_save(hid_t h5obj, py::object obj);
     void memorize_save(py::object h5gr, py::object obj);
 
     py::object save_reduce(py::object func,
@@ -63,25 +72,21 @@ class Hdf5Saver
                            py::object obj = py::none(),
                            py::object path = py::none());
 
-    py::object save_none(py::object obj, std::string const& path, std::string const& type_repr);
-    py::object save_dataset(py::object obj, std::string const& path, std::string type_repr);
-    py::object save_masked_array(py::object obj,
-                                 std::string const& path,
-                                 std::string const& type_repr);
-    py::object save_iterable(py::object obj,
-                             std::string const& path,
-                             std::string const& type_repr);
-    void save_iterable_content(py::object obj, py::object h5gr, std::string const& subpath);
-    py::object save_dict(py::object obj, std::string const& path, std::string const& type_repr);
-    std::string save_dict_content(py::object obj, py::object h5gr, std::string const& subpath);
-    py::object save_range(py::object obj, std::string const& path, std::string const& type_repr);
-    py::object save_dtype(py::object obj, std::string const& path, std::string const& type_repr);
-    py::object save_ignored(py::object obj, std::string const& path, std::string const& type_repr);
-    py::object save_global(py::object obj, std::string const& path, std::string const& type_repr);
+    hid_t save_none(py::object obj, std::string const& path, std::string const& type_repr);
+    hid_t save_dataset(py::object obj, std::string const& path, std::string const& type_repr);
+    hid_t save_masked_array(py::object obj, std::string const& path, std::string const& type_repr);
+    hid_t save_iterable(py::object obj, std::string const& path, std::string const& type_repr);
+    void save_iterable_content(py::object obj, HighFive::Group& h5gr, std::string const& subpath);
+    hid_t save_dict(py::object obj, std::string const& path, std::string const& type_repr);
+    std::string save_dict_content(py::object obj, HighFive::Group& h5gr, std::string const& subpath);
+    hid_t save_range(py::object obj, std::string const& path, std::string const& type_repr);
+    hid_t save_dtype(py::object obj, std::string const& path, std::string const& type_repr);
+    hid_t save_ignored(py::object obj, std::string const& path, std::string const& type_repr);
+    hid_t save_global(py::object obj, std::string const& path, std::string const& type_repr);
 
   private:
     HighFive::Group native_group;
-    std::unordered_map<std::uint64_t, std::string> memo_save_paths;
+    std::unordered_map<std::uint64_t, std::pair<hid_t, py::object>> memo_save_ids;
     py::dict dispatch_save() const;
 };
 
@@ -98,41 +103,50 @@ class Hdf5Loader
     py::dict memo_load() const;
 
     py::object load(py::object path = py::none());
+    py::object load_from(hid_t h5obj, std::string subpath);
+    void memorize_load(hid_t h5obj, py::object obj);
     void memorize_load(py::object h5gr, py::object obj);
     py::object get_all_hdf5_keys(py::object h5_group = py::none());
     static py::object get_attr(py::object h5gr, std::string const& attr_name);
+    static py::object get_attr(hid_t h5obj, std::string const& attr_name);
 
-    py::object load_none(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_dataset(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_str(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_converted_to_str(py::object h5gr,
-                                     py::object type_info,
+    py::object load_none(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_dataset(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_str(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_converted_to_str(hid_t h5obj,
+                                     std::string const& type_info,
                                      std::string const& subpath);
-    py::object load_masked_array(py::object h5gr,
-                                 py::object type_info,
+    py::object load_masked_array(hid_t h5obj,
+                                 std::string const& type_info,
                                  std::string const& subpath);
-    py::object load_list(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_set(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_tuple(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_dict(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_general_dict(py::object h5gr,
-                                 py::object type_info,
+    py::object load_list(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_set(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_tuple(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_dict(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_general_dict(hid_t h5obj,
+                                 std::string const& type_info,
                                  std::string const& subpath);
-    py::object load_simple_dict(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_range(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_dtype(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_hdf5exportable(py::object h5gr,
-                                   py::object type_info,
+    py::object load_simple_dict(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_range(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_dtype(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_hdf5exportable(hid_t h5obj,
+                                   std::string const& type_info,
                                    std::string const& subpath);
-    py::object load_ignored(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_global(py::object h5gr, py::object type_info, std::string const& subpath);
-    py::object load_reduce(py::object h5gr, py::object type_info, std::string const& subpath);
+    py::object load_ignored(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_global(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_reduce(hid_t h5obj, std::string const& type_info, std::string const& subpath);
 
   private:
     HighFive::Group native_group;
     std::unordered_map<std::string, py::object> memo_load_objects;
     py::dict dispatch_load() const;
 };
+
+using SaveMethod = hid_t (Hdf5Saver::*)(py::object, std::string const&, std::string const&);
+using LoadMethod = py::object (Hdf5Loader::*)(hid_t, std::string const&, std::string const&);
+
+std::unordered_map<PyTypeObject*, std::pair<SaveMethod, char const*>>& cpp_save_dispatch();
+std::unordered_map<std::string, LoadMethod>& cpp_load_dispatch();
 
 py::object save_to_hdf5(py::object h5group, py::object obj, std::string path = "/");
 py::object load_from_hdf5(py::object h5group,

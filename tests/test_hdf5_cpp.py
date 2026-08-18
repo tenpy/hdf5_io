@@ -163,3 +163,37 @@ def test_save_load_pickle_roundtrip(tmp_path):
     hdf5_io.save(data, str(path))
     loaded = hdf5_io.load(str(path))
     assert loaded == data
+
+
+class Point:
+    def __init__(self, x, y, label='p'):
+        self.x = x
+        self.y = y
+        self.label = label
+
+    def save_hdf5(self, hdf5_saver, h5gr, subpath):
+        hdf5_saver.save(self.x, subpath + 'x')
+        hdf5_saver.save(self.y, subpath + 'y')
+        h5gr.attrs['label'] = self.label
+
+    @classmethod
+    def from_hdf5(cls, hdf5_loader, h5gr, subpath):
+        obj = cls.__new__(cls)
+        hdf5_loader.memorize_load(h5gr, obj)
+        obj.x = hdf5_loader.load(subpath + 'x')
+        obj.y = hdf5_loader.load(subpath + 'y')
+        obj.label = hdf5_loader.get_attr(h5gr, 'label')
+        return obj
+
+
+def test_python_save_hdf5_callback(tmp_path):
+    point = Point(1.5, 2.5, 'origin')
+    filename = tmp_path / 'point.hdf5'
+    with h5py.File(filename, 'w') as f:
+        hdf5_io.save_to_hdf5(f, point)
+    with h5py.File(filename, 'r') as f:
+        loaded = hdf5_io.load_from_hdf5(f)
+    assert isinstance(loaded, Point)
+    assert loaded.x == 1.5
+    assert loaded.y == 2.5
+    assert loaded.label == 'origin'

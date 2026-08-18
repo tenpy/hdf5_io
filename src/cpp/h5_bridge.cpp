@@ -439,7 +439,359 @@ h5_get_attr(py::handle h5obj, std::string const& name)
 bool
 h5_contains(py::handle parent, std::string const& name)
 {
-    return py::bool_(parent.attr("__contains__")(name));
+    auto group = wrap_group(parent);
+    return h5_contains(group, name);
+}
+
+HighFive::Group
+group_from_hid(hid_t hid)
+{
+    return HighFive::detail::make_group(hid);
+}
+
+hid_t
+h5_open(hid_t loc, std::string const& path)
+{
+    if (path.empty() || path == "/") {
+        check_hdf5(H5Iinc_ref(loc), "H5Iinc_ref");
+        return loc;
+    }
+    hid_t id = H5Oopen(loc, path.c_str(), H5P_DEFAULT);
+    if (id < 0)
+        throw Hdf5ExportError("failed to open HDF5 object " + path);
+    return id;
+}
+
+hid_t
+h5_open(HighFive::Group& parent, std::string const& path)
+{
+    return h5_open(parent.getId(), path);
+}
+
+std::string
+h5_object_name(hid_t hid)
+{
+    ssize_t sz = H5Iget_name(hid, nullptr, 0);
+    if (sz < 0)
+        throw Hdf5ExportError("H5Iget_name failed");
+    if (sz == 0)
+        return "/";
+    std::string name(static_cast<size_t>(sz), '\0');
+    H5Iget_name(hid, name.data(), static_cast<size_t>(sz) + 1);
+    return name;
+}
+
+bool
+h5_contains(hid_t loc, std::string const& name)
+{
+    htri_t exists = H5Lexists(loc, name.c_str(), H5P_DEFAULT);
+    return exists > 0;
+}
+
+bool
+h5_contains(HighFive::Group& parent, std::string const& name)
+{
+    return h5_contains(parent.getId(), name);
+}
+
+std::vector<std::string>
+h5_link_names(hid_t loc)
+{
+    H5G_info_t info{};
+    check_hdf5(H5Gget_info(loc, &info), "H5Gget_info");
+    std::vector<std::string> names;
+    names.reserve(static_cast<size_t>(info.nlinks));
+    for (hsize_t i = 0; i < info.nlinks; ++i) {
+        ssize_t sz = H5Lget_name_by_idx(
+          loc, ".", H5_INDEX_NAME, H5_ITER_INC, i, nullptr, 0, H5P_DEFAULT);
+        if (sz < 0)
+            throw Hdf5ExportError("H5Lget_name_by_idx failed");
+        std::string name(static_cast<size_t>(sz), '\0');
+        H5Lget_name_by_idx(loc,
+                           ".",
+                           H5_INDEX_NAME,
+                           H5_ITER_INC,
+                           i,
+                           name.data(),
+                           static_cast<size_t>(sz) + 1,
+                           H5P_DEFAULT);
+        names.push_back(std::move(name));
+    }
+    return names;
+}
+
+void
+h5_set_attr(hid_t loc, std::string const& name, std::string const& value)
+{
+    write_attr_vlen_string(loc, name, value, true);
+}
+
+void
+h5_set_attr(hid_t loc, std::string const& name, std::int64_t value)
+{
+    if (H5Aexists(loc, name.c_str()) > 0)
+        check_hdf5(H5Adelete(loc, name.c_str()), "H5Adelete");
+    hid_t type = H5Tcopy(H5T_NATIVE_INT64);
+    hid_t space = H5Screate(H5S_SCALAR);
+    hid_t attr = H5Acreate2(loc, name.c_str(), type, space, H5P_DEFAULT, H5P_DEFAULT);
+    if (attr < 0) {
+        H5Sclose(space);
+        H5Tclose(type);
+        throw Hdf5ExportError("failed to create attribute " + name);
+    }
+    herr_t st = H5Awrite(attr, type, &value);
+    H5Aclose(attr);
+    H5Sclose(space);
+    H5Tclose(type);
+    check_hdf5(st, "H5Awrite int64");
+}
+
+void
+h5_set_attr(hid_t loc, std::string const& name, bool value)
+{
+    if (H5Aexists(loc, name.c_str()) > 0)
+        check_hdf5(H5Adelete(loc, name.c_str()), "H5Adelete");
+    hid_t type = H5Tcopy(H5T_NATIVE_UINT8);
+    hid_t space = H5Screate(H5S_SCALAR);
+    hid_t attr = H5Acreate2(loc, name.c_str(), type, space, H5P_DEFAULT, H5P_DEFAULT);
+    if (attr < 0) {
+        H5Sclose(space);
+        H5Tclose(type);
+        throw Hdf5ExportError("failed to create attribute " + name);
+    }
+    std::uint8_t v = value ? 1u : 0u;
+    herr_t st = H5Awrite(attr, type, &v);
+    H5Aclose(attr);
+    H5Sclose(space);
+    H5Tclose(type);
+    check_hdf5(st, "H5Awrite bool");
+}
+
+void
+h5_set_attr(hid_t loc, std::string const& name, py::handle value)
+{
+    if (py::isinstance<py::str>(value)) {
+        h5_set_attr(loc, name, value.cast<std::string>());
+        return;
+    }
+    if (value.ptr() == Py_True || value.ptr() == Py_False) {
+        h5_set_attr(loc, name, PyObject_IsTrue(value.ptr()) != 0);
+        return;
+    }
+    py::module_ np = py::module_::import("numpy");
+    if (py::isinstance<py::int_>(value) && !py::isinstance(value, np.attr("integer"))) {
+        h5_set_attr(loc, name, value.cast<std::int64_t>());
+        return;
+    }
+    py::object pyobj = h5py_from_hid(loc);
+    pyobj.attr("attrs")[py::str(name)] = value;
+}
+
+py::object
+h5_get_attr(hid_t loc, std::string const& name)
+{
+    if (H5Aexists(loc, name.c_str()) <= 0)
+        return py::none();
+    hid_t attr = H5Aopen(loc, name.c_str(), H5P_DEFAULT);
+    if (attr < 0)
+        throw Hdf5ExportError("failed to open attribute " + name);
+    hid_t type = H5Aget_type(attr);
+    H5T_class_t cls = H5Tget_class(type);
+    py::object result = py::none();
+    if (cls == H5T_STRING) {
+        if (H5Tis_variable_str(type) > 0) {
+            char* buf = nullptr;
+            check_hdf5(H5Aread(attr, type, &buf), "H5Aread string");
+            result = py::str(buf ? buf : "");
+            if (buf)
+                H5free_memory(buf);
+        } else {
+            size_t sz = H5Tget_size(type);
+            std::string s(sz, '\0');
+            check_hdf5(H5Aread(attr, type, s.data()), "H5Aread string");
+            auto z = s.find('\0');
+            if (z != std::string::npos)
+                s.resize(z);
+            result = py::str(s);
+        }
+    } else if (cls == H5T_INTEGER) {
+        long long v = 0;
+        hid_t ntype = H5Tcopy(H5T_NATIVE_LLONG);
+        check_hdf5(H5Aread(attr, ntype, &v), "H5Aread int");
+        H5Tclose(ntype);
+        result = py::int_(v);
+    } else if (cls == H5T_FLOAT) {
+        double v = 0;
+        hid_t ntype = H5Tcopy(H5T_NATIVE_DOUBLE);
+        check_hdf5(H5Aread(attr, ntype, &v), "H5Aread float");
+        H5Tclose(ntype);
+        result = py::float_(v);
+    } else {
+        H5Tclose(type);
+        H5Aclose(attr);
+        py::object pyobj = h5py_from_hid(loc);
+        return pyobj.attr("attrs").attr("get")(py::str(name));
+    }
+    H5Tclose(type);
+    H5Aclose(attr);
+    return result;
+}
+
+namespace {
+
+bool
+is_hdf5_bool_enum(hid_t ntype)
+{
+    if (H5Tget_class(ntype) != H5T_ENUM)
+        return false;
+    int n = H5Tget_nmembers(ntype);
+    if (n != 2)
+        return false;
+    char* a = H5Tget_member_name(ntype, 0);
+    char* b = H5Tget_member_name(ntype, 1);
+    bool ok = false;
+    if (a && b) {
+        std::string na(a);
+        std::string nb(b);
+        ok = (na == "FALSE" && nb == "TRUE") || (na == "TRUE" && nb == "FALSE");
+    }
+    if (a)
+        H5free_memory(a);
+    if (b)
+        H5free_memory(b);
+    return ok;
+}
+
+py::dtype
+dtype_from_hdf5(hid_t ntype)
+{
+    H5T_class_t cls = H5Tget_class(ntype);
+    size_t sz = H5Tget_size(ntype);
+    if (cls == H5T_ENUM) {
+        if (is_hdf5_bool_enum(ntype))
+            return py::dtype("bool");
+        hid_t super = H5Tget_super(ntype);
+        py::dtype dt = dtype_from_hdf5(super);
+        H5Tclose(super);
+        return dt;
+    }
+    if (cls == H5T_BITFIELD) {
+        if (sz == 1)
+            return py::dtype::of<std::uint8_t>();
+        if (sz == 2)
+            return py::dtype::of<std::uint16_t>();
+        if (sz == 4)
+            return py::dtype::of<std::uint32_t>();
+        if (sz == 8)
+            return py::dtype::of<std::uint64_t>();
+    }
+    if (cls == H5T_INTEGER) {
+        H5T_sign_t sign = H5Tget_sign(ntype);
+        if (sign == H5T_SGN_NONE) {
+            if (sz == 1)
+                return py::dtype::of<std::uint8_t>();
+            if (sz == 2)
+                return py::dtype::of<std::uint16_t>();
+            if (sz == 4)
+                return py::dtype::of<std::uint32_t>();
+            if (sz == 8)
+                return py::dtype::of<std::uint64_t>();
+        } else {
+            if (sz == 1)
+                return py::dtype::of<std::int8_t>();
+            if (sz == 2)
+                return py::dtype::of<std::int16_t>();
+            if (sz == 4)
+                return py::dtype::of<std::int32_t>();
+            if (sz == 8)
+                return py::dtype::of<std::int64_t>();
+        }
+    } else if (cls == H5T_FLOAT) {
+        if (sz == 2)
+            return py::dtype("float16");
+        if (sz == 4)
+            return py::dtype::of<float>();
+        if (sz == 8)
+            return py::dtype::of<double>();
+    } else if (cls == H5T_COMPOUND) {
+        if (sz == sizeof(std::complex<float>))
+            return py::dtype::of<std::complex<float>>();
+        if (sz == sizeof(std::complex<double>))
+            return py::dtype::of<std::complex<double>>();
+    }
+    throw Hdf5ExportError("unsupported HDF5 dataset dtype");
+}
+
+} // namespace
+
+py::array
+h5_read_array_h5py(hid_t dset)
+{
+    py::object ds = h5py_from_hid(dset);
+    py::object val = ds.attr("__getitem__")(py::ellipsis());
+    return py::module_::import("numpy").attr("asarray")(val).cast<py::array>();
+}
+
+py::array
+h5_read_array(hid_t dset)
+{
+    hid_t ftype = H5Dget_type(dset);
+    hid_t ntype = H5Tget_native_type(ftype, H5T_DIR_ASCEND);
+    hid_t space = H5Dget_space(dset);
+    auto close_types = [&]() {
+        H5Sclose(space);
+        H5Tclose(ntype);
+        H5Tclose(ftype);
+    };
+    try {
+        H5S_class_t space_type = H5Sget_simple_extent_type(space);
+        py::array arr;
+        if (space_type == H5S_SCALAR) {
+            py::dtype dt = dtype_from_hdf5(ntype);
+            arr = py::array(dt, std::vector<py::ssize_t>{});
+            check_hdf5(H5Dread(dset, ntype, H5S_ALL, H5S_ALL, H5P_DEFAULT, arr.mutable_data()),
+                       "H5Dread scalar");
+        } else {
+            int ndims = H5Sget_simple_extent_ndims(space);
+            std::vector<hsize_t> dims(static_cast<size_t>(ndims));
+            H5Sget_simple_extent_dims(space, dims.data(), nullptr);
+            std::vector<py::ssize_t> shape(dims.begin(), dims.end());
+            py::dtype dt = dtype_from_hdf5(ntype);
+            arr = py::array(dt, shape);
+            if (arr.size() > 0)
+                check_hdf5(H5Dread(dset, ntype, H5S_ALL, H5S_ALL, H5P_DEFAULT, arr.mutable_data()),
+                           "H5Dread array");
+        }
+        close_types();
+        return arr;
+    } catch (Hdf5ExportError const&) {
+        close_types();
+        return h5_read_array_h5py(dset);
+    }
+}
+
+std::string
+h5_read_vlen_string(hid_t dset)
+{
+    hid_t type = H5Dget_type(dset);
+    std::string result;
+    if (H5Tis_variable_str(type) > 0) {
+        char* buf = nullptr;
+        check_hdf5(H5Dread(dset, type, H5S_ALL, H5S_ALL, H5P_DEFAULT, &buf), "H5Dread vlen");
+        result = buf ? buf : "";
+        if (buf)
+            H5free_memory(buf);
+    } else {
+        size_t sz = H5Tget_size(type);
+        result.assign(sz, '\0');
+        check_hdf5(H5Dread(dset, type, H5S_ALL, H5S_ALL, H5P_DEFAULT, result.data()),
+                   "H5Dread string");
+        auto z = result.find('\0');
+        if (z != std::string::npos)
+            result.resize(z);
+    }
+    H5Tclose(type);
+    return result;
 }
 
 } // namespace hdf5_io
