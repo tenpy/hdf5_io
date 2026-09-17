@@ -34,11 +34,12 @@ build-backend = "scikit_build_core.build"
 [tool.scikit-build]
 cmake.version = ">=3.15"
 build-dir = "build"
-cmake.build-type = "Debug"
+cmake.build-type = "RelWithDebInfo"
 wheel.packages = ["hdf5_io"]
 
 [tool.scikit-build.cmake.define]
 BUILD_TESTING = {env = "BUILD_TESTING", default = "ON"}
+HDF5_IO_BUILD_PYTHON = {env = "HDF5_IO_BUILD_PYTHON", default = "ON"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

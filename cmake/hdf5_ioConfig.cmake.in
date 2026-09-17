@@ -1,0 +1,7 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(HDF5 REQUIRED COMPONENTS C)
+
+include("${CMAKE_CURRENT_LIST_DIR}/hdf5_ioTargets.cmake")
+check_required_components(hdf5_io)

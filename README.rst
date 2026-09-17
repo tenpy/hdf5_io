@@ -18,9 +18,20 @@ pybind11 bindings (``hdf5_io._core``). HDF5 groups, datasets, attributes, and ha
 written through **libhdf5 + HighFive**, while callers still pass **h5py** ``File``/``Group``
 objects. On-disk format and Python API are backwards compatible with the reference module.
 
+The build is split into:
+
+* ``hdf5_io_core`` — Python-free static library (``h5_ops``, ``core::Saver`` / ``core::Loader``,
+  type registry). Link this from C++ projects such as cyten (``HDF5_IO_BUILD_PYTHON=OFF``).
+* ``hdf5_io_py`` + ``_core`` — pybind11 / h5py facade (optional, default ON for pip installs).
+
 Build (editable install, similar to cyten)::
 
     pip install -v --no-build-isolation -C editable.rebuild=true -e .
+
+Core-only CMake (no Python)::
+
+    cmake -S . -B build-core -DHDF5_IO_BUILD_PYTHON=OFF -DBUILD_TESTING=ON
+    cmake --build build-core && ctest --test-dir build-core
 
 Requirements: Python >= 3.10, numpy, h5py, HDF5 development libraries, CMake, pybind11.
 HighFive is fetched automatically via CMake if not installed system-wide.
