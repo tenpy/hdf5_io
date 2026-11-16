@@ -202,6 +202,7 @@ group_from_hid(hid_t hid)
 std::string
 object_token(hid_t hid)
 {
+#if H5_VERSION_GE(1, 12, 0)
     H5O_info2_t info{};
     check_hdf5(H5Oget_info3(hid, &info, H5O_INFO_BASIC), "H5Oget_info3");
     char* token_cstr = nullptr;
@@ -209,6 +210,13 @@ object_token(hid_t hid)
     std::string token(token_cstr);
     check_hdf5(H5free_memory(token_cstr), "H5free_memory");
     return token;
+#else
+    // HDF5 < 1.12 (e.g. manylinux EPEL 1.10.5): identity is (fileno, addr).
+    H5O_info_t info{};
+    check_hdf5(H5Oget_info(hid, &info), "H5Oget_info");
+    return std::to_string(info.fileno) + ":" +
+           std::to_string(static_cast<unsigned long long>(info.addr));
+#endif
 }
 
 HighFive::Group

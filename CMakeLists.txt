@@ -38,6 +38,11 @@ include(CMakePackageConfigHelpers)
 # #####################################################################
 find_package(HDF5 REQUIRED COMPONENTS C)
 cmake_print_variables(HDF5_VERSION HDF5_INCLUDE_DIRS)
+# object_token uses H5O token APIs on HDF5 >= 1.12 and (fileno, addr) on older releases
+# (manylinux_2_28 EPEL still ships 1.10.x).
+if(HDF5_VERSION VERSION_LESS "1.10")
+  message(FATAL_ERROR "hdf5_io requires HDF5 >= 1.10 (found ${HDF5_VERSION})")
+endif()
 
 find_package(HighFive CONFIG QUIET)
 if(NOT HighFive_FOUND)
