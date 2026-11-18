@@ -18,13 +18,13 @@ nanobind bindings (``tenpy_hdf5._core``). HDF5 groups, datasets, attributes, and
 written through **libhdf5 + HighFive**, while callers still pass **h5py** ``File``/``Group``
 objects. On-disk format and Python API are backwards compatible with the reference module.
 
-The C++ library namespace and headers remain ``hdf5_io`` (``#include <hdf5_io/...>``).
+The C++ library namespace and headers are ``tenpy_hdf5`` (``#include <tenpy_hdf5/...>``).
 
 The build is split into:
 
-* ``hdf5_io_core`` — Python-free static library (``h5_ops``, ``core::Saver`` / ``core::Loader``,
-  type registry). Link this from C++ projects such as lasyten (``HDF5_IO_BUILD_PYTHON=OFF``).
-* ``hdf5_io_py`` + ``_core`` — nanobind / h5py facade (optional, default ON for pip installs).
+* ``tenpy_hdf5_core`` — Python-free static library (``h5_ops``, ``core::Saver`` / ``core::Loader``,
+  type registry). Link this from C++ projects such as lasyten (``TENPY_HDF5_BUILD_PYTHON=OFF``).
+* ``tenpy_hdf5_py`` + ``_core`` — nanobind / h5py facade (optional, default ON for pip installs).
 
 Build (editable install)::
 
@@ -32,7 +32,7 @@ Build (editable install)::
 
 Core-only CMake (no Python)::
 
-    cmake -S . -B build-core -DHDF5_IO_BUILD_PYTHON=OFF -DBUILD_TESTING=ON
+    cmake -S . -B build-core -DTENPY_HDF5_BUILD_PYTHON=OFF -DBUILD_TESTING=ON
     cmake --build build-core && ctest --test-dir build-core
 
 Requirements: Python >= 3.12, numpy, h5py, HDF5 development libraries, CMake, nanobind >= 3.0.

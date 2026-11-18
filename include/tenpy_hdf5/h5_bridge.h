@@ -1,14 +1,14 @@
 #pragma once
 
-#include <hdf5_io/h5_ops.h>
-#include <hdf5_io/python.h>
+#include <tenpy_hdf5/h5_ops.h>
+#include <tenpy_hdf5/python.h>
 
 #include <complex>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 /// Integer HDF5 identifier stored by h5py (``obj.id.id``).
 hid_t hid_from_h5py(py::handle obj);
@@ -59,4 +59,4 @@ bool h5_contains(py::handle parent, std::string const& name);
 /// Read a dataset as a numpy array (0-d for scalar dataspace).
 NumpyArray h5_read_array(hid_t dset);
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

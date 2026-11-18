@@ -1,7 +1,7 @@
-#include <hdf5_io/h5_bridge.h>
-#include <hdf5_io/hdf5_io.h>
+#include <tenpy_hdf5/h5_bridge.h>
+#include <tenpy_hdf5/tenpy_hdf5.h>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 namespace {
 
@@ -491,4 +491,4 @@ Hdf5Loader::load_reduce(hid_t h5obj, std::string const& type_info, std::string c
     return obj;
 }
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

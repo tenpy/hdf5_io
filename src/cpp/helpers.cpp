@@ -1,6 +1,6 @@
-#include <hdf5_io/hdf5_io.h>
+#include <tenpy_hdf5/tenpy_hdf5.h>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 bool
 valid_hdf5_path_component(py::handle name)
@@ -22,4 +22,4 @@ find_global(std::string const& module, std::string const& qualified_name)
     return obj;
 }
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

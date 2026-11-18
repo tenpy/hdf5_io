@@ -1,8 +1,8 @@
 #pragma once
 
-/// Python-free HDF5/HighFive helpers used by hdf5_io_core and the nanobind bridge.
+/// Python-free HDF5/HighFive helpers used by tenpy_hdf5_core and the nanobind bridge.
 
-#include <hdf5_io/exceptions.h>
+#include <tenpy_hdf5/exceptions.h>
 
 #include <complex>
 #include <cstdint>
@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 /// Contiguous array view for dataset I/O.
 struct Hdf5Buffer
@@ -88,4 +88,4 @@ std::string h5_read_vlen_string(hid_t dset);
 /// Read a numeric/bool dataset into an owned buffer (fills shape/kind/itemsize).
 Hdf5Buffer h5_read_buffer(hid_t dset);
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

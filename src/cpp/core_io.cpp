@@ -1,4 +1,4 @@
-#include <hdf5_io/core_io.h>
+#include <tenpy_hdf5/core_io.h>
 
 #include <hdf5.h>
 
@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace hdf5_io::core {
+namespace tenpy_hdf5::core {
 
 namespace {
 
@@ -406,4 +406,4 @@ Loader::load_dispatch(hid_t h5obj, std::string const& subpath, std::shared_ptr<v
     return t;
 }
 
-} // namespace hdf5_io::core
+} // namespace tenpy_hdf5::core

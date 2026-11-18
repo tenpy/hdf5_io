@@ -1,4 +1,4 @@
-#include <hdf5_io/h5_ops.h>
+#include <tenpy_hdf5/h5_ops.h>
 
 #include <hdf5.h>
 #include <highfive/highfive.hpp>
@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 void
 check_hdf5(herr_t status, char const* what)
@@ -502,4 +502,4 @@ h5_read_buffer(hid_t dset)
     return buf;
 }
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

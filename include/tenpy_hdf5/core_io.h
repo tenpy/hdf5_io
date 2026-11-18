@@ -2,9 +2,9 @@
 
 /// Python-free TeNPy-format HDF5 saver/loader for linking into C++ libraries (e.g. cyten).
 
-#include <hdf5_io/constants.h>
-#include <hdf5_io/exceptions.h>
-#include <hdf5_io/h5_ops.h>
+#include <tenpy_hdf5/constants.h>
+#include <tenpy_hdf5/exceptions.h>
+#include <tenpy_hdf5/h5_ops.h>
 
 #include <complex>
 #include <cstdint>
@@ -17,7 +17,7 @@
 #include <variant>
 #include <vector>
 
-namespace hdf5_io::core {
+namespace tenpy_hdf5::core {
 
 class Saver;
 class Loader;
@@ -124,4 +124,4 @@ class Loader
     std::unordered_map<std::string, std::shared_ptr<void>> memo_;
 };
 
-} // namespace hdf5_io::core
+} // namespace tenpy_hdf5::core

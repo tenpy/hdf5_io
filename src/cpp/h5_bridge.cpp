@@ -1,6 +1,6 @@
-#include <hdf5_io/exceptions.h>
-#include <hdf5_io/h5_bridge.h>
-#include <hdf5_io/h5_ops.h>
+#include <tenpy_hdf5/exceptions.h>
+#include <tenpy_hdf5/h5_bridge.h>
+#include <tenpy_hdf5/h5_ops.h>
 
 #include <hdf5.h>
 #include <highfive/highfive.hpp>
@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 namespace {
 
@@ -520,4 +520,4 @@ h5_read_array(hid_t dset)
     }
 }
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

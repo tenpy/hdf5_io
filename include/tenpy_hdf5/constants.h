@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 inline constexpr char const* REPR_IGNORED = "ignore";
 inline constexpr char const* REPR_HDF5EXPORTABLE = "instance";
@@ -40,4 +40,4 @@ inline constexpr char const* ATTR_MODULE = "module";
 inline constexpr char const* ATTR_LEN = "len";
 inline constexpr char const* ATTR_FORMAT = "format";
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

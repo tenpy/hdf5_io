@@ -1,6 +1,6 @@
 message(STATUS "")
 message(STATUS "------------------------------------------------------------------------")
-message(STATUS " Project hdf5_io, HDF5 import/export with nanobind bindings ")
+message(STATUS " Project tenpy_hdf5, HDF5 import/export with nanobind bindings ")
 message(STATUS "------------------------------------------------------------------------")
 message(STATUS "")
 
@@ -18,13 +18,13 @@ option(BUILD_TESTING "Build ctest tests" ON)
 option(LINTING "Use clang-tidy for linting" OFF)
 # Default ON for scikit-build / pip installs; OFF when embedding as a C++ dependency.
 if(DEFINED SKBUILD)
-  option(HDF5_IO_BUILD_PYTHON "Build nanobind module and Python-facing library" ON)
+  option(TENPY_HDF5_BUILD_PYTHON "Build nanobind module and Python-facing library" ON)
 else()
-  option(HDF5_IO_BUILD_PYTHON "Build nanobind module and Python-facing library" ON)
+  option(TENPY_HDF5_BUILD_PYTHON "Build nanobind module and Python-facing library" ON)
 endif()
 
 project(
-  hdf5_io
+  tenpy_hdf5
   VERSION ${SKBUILD_PROJECT_VERSION}
   LANGUAGES CXX
 )
@@ -41,7 +41,7 @@ cmake_print_variables(HDF5_VERSION HDF5_INCLUDE_DIRS)
 # object_token uses H5O token APIs on HDF5 >= 1.12 and (fileno, addr) on older releases
 # (manylinux_2_28 EPEL still ships 1.10.x).
 if(HDF5_VERSION VERSION_LESS "1.10")
-  message(FATAL_ERROR "hdf5_io requires HDF5 >= 1.10 (found ${HDF5_VERSION})")
+  message(FATAL_ERROR "tenpy_hdf5 requires HDF5 >= 1.10 (found ${HDF5_VERSION})")
 endif()
 
 find_package(HighFive CONFIG QUIET)
@@ -61,43 +61,43 @@ if(NOT HighFive_FOUND)
 endif()
 
 # #####################################################################
-# ## hdf5_io_core (Python-free)
+# ## tenpy_hdf5_core (Python-free)
 # #####################################################################
-add_library(hdf5_io_core STATIC)
-set_property(TARGET hdf5_io_core PROPERTY C_VISIBILITY_PRESET hidden)
-set_property(TARGET hdf5_io_core PROPERTY CXX_VISIBILITY_PRESET hidden)
-set_property(TARGET hdf5_io_core PROPERTY VISIBILITY_INLINES_HIDDEN ON)
-target_compile_options(hdf5_io_core PRIVATE
+add_library(tenpy_hdf5_core STATIC)
+set_property(TARGET tenpy_hdf5_core PROPERTY C_VISIBILITY_PRESET hidden)
+set_property(TARGET tenpy_hdf5_core PROPERTY CXX_VISIBILITY_PRESET hidden)
+set_property(TARGET tenpy_hdf5_core PROPERTY VISIBILITY_INLINES_HIDDEN ON)
+target_compile_options(tenpy_hdf5_core PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-fvisibility=hidden>
 )
-target_compile_options(hdf5_io_core PUBLIC -fPIC)
+target_compile_options(tenpy_hdf5_core PUBLIC -fPIC)
 
-target_include_directories(hdf5_io_core
+target_include_directories(tenpy_hdf5_core
   PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-target_sources(hdf5_io_core PRIVATE
+target_sources(tenpy_hdf5_core PRIVATE
   src/cpp/h5_ops.cpp
   src/cpp/core_io.cpp
 )
 
-target_link_libraries(hdf5_io_core PUBLIC HDF5::HDF5)
+target_link_libraries(tenpy_hdf5_core PUBLIC HDF5::HDF5)
 if(TARGET HighFive::HighFive)
-  target_link_libraries(hdf5_io_core PUBLIC HighFive::HighFive)
+  target_link_libraries(tenpy_hdf5_core PUBLIC HighFive::HighFive)
 elseif(TARGET HighFive)
-  target_link_libraries(hdf5_io_core PUBLIC HighFive)
+  target_link_libraries(tenpy_hdf5_core PUBLIC HighFive)
 else()
   message(FATAL_ERROR "HighFive CMake target not found")
 endif()
 
-add_library(hdf5_io::core ALIAS hdf5_io_core)
+add_library(tenpy_hdf5::core ALIAS tenpy_hdf5_core)
 
 # #####################################################################
 # ## Python / nanobind (optional)
 # #####################################################################
-if(HDF5_IO_BUILD_PYTHON)
+if(TENPY_HDF5_BUILD_PYTHON)
   set(Python_FIND_VIRTUALENV ONLY)
   set(Python_FIND_STRATEGY LOCATION)
   find_package(Python REQUIRED COMPONENTS Interpreter Development.Module Development.SABIModule)
@@ -113,31 +113,31 @@ if(HDF5_IO_BUILD_PYTHON)
   cmake_print_variables(Python_VERSION)
 
   # Stable ABI (abi3, Python >= 3.12). Mirrors the conditions under which nanobind honors
-  # STABLE_ABI; hdf5_io_py has to be compiled with the same Py_LIMITED_API as the module.
-  set(HDF5_IO_STABLE_ABI OFF)
+  # STABLE_ABI; tenpy_hdf5_py has to be compiled with the same Py_LIMITED_API as the module.
+  set(TENPY_HDF5_STABLE_ABI OFF)
   if(TARGET Python::SABIModule
      AND Python_VERSION VERSION_GREATER_EQUAL "3.12"
      AND NOT NB_ABI MATCHES "[0-9]t")
-    set(HDF5_IO_STABLE_ABI ON)
+    set(TENPY_HDF5_STABLE_ABI ON)
   endif()
 
-  add_library(hdf5_io_py STATIC)
-  set_property(TARGET hdf5_io_py PROPERTY C_VISIBILITY_PRESET hidden)
-  set_property(TARGET hdf5_io_py PROPERTY CXX_VISIBILITY_PRESET hidden)
-  set_property(TARGET hdf5_io_py PROPERTY VISIBILITY_INLINES_HIDDEN ON)
-  target_compile_options(hdf5_io_py PRIVATE
+  add_library(tenpy_hdf5_py STATIC)
+  set_property(TARGET tenpy_hdf5_py PROPERTY C_VISIBILITY_PRESET hidden)
+  set_property(TARGET tenpy_hdf5_py PROPERTY CXX_VISIBILITY_PRESET hidden)
+  set_property(TARGET tenpy_hdf5_py PROPERTY VISIBILITY_INLINES_HIDDEN ON)
+  target_compile_options(tenpy_hdf5_py PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:-fvisibility=hidden>
   )
-  target_compile_options(hdf5_io_py PUBLIC -fPIC)
+  target_compile_options(tenpy_hdf5_py PUBLIC -fPIC)
 
-  target_include_directories(hdf5_io_py
+  target_include_directories(tenpy_hdf5_py
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
     PUBLIC
       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   )
 
-  target_sources(hdf5_io_py PRIVATE
+  target_sources(tenpy_hdf5_py PRIVATE
     src/cpp/h5_bridge.cpp
     src/cpp/helpers.cpp
     src/cpp/exportable.cpp
@@ -148,17 +148,17 @@ if(HDF5_IO_BUILD_PYTHON)
 
   # nanobind headers (header-only part) + Python headers; the nanobind library itself is
   # linked into _core by nanobind_add_module().
-  target_include_directories(hdf5_io_py SYSTEM PUBLIC ${NB_DIR}/include)
-  target_link_libraries(hdf5_io_py PUBLIC hdf5_io_core Python::Module)
-  target_compile_features(hdf5_io_py PUBLIC cxx_std_17)
-  if(HDF5_IO_STABLE_ABI)
-    target_compile_definitions(hdf5_io_py PUBLIC Py_LIMITED_API=0x030C0000)
+  target_include_directories(tenpy_hdf5_py SYSTEM PUBLIC ${NB_DIR}/include)
+  target_link_libraries(tenpy_hdf5_py PUBLIC tenpy_hdf5_core Python::Module)
+  target_compile_features(tenpy_hdf5_py PUBLIC cxx_std_17)
+  if(TENPY_HDF5_STABLE_ABI)
+    target_compile_definitions(tenpy_hdf5_py PUBLIC Py_LIMITED_API=0x030C0000)
   endif()
 
-  # Back-compat alias for older link lines.
-  add_library(hdf5_io ALIAS hdf5_io_py)
+  # Alias for the Python-facing static library.
+  add_library(tenpy_hdf5 ALIAS tenpy_hdf5_py)
 
-  if(HDF5_IO_STABLE_ABI)
+  if(TENPY_HDF5_STABLE_ABI)
     nanobind_add_module(_core STABLE_ABI pybind/_core.cpp)
   else()
     nanobind_add_module(_core pybind/_core.cpp)
@@ -168,7 +168,7 @@ if(HDF5_IO_BUILD_PYTHON)
     PUBLIC ${PROJECT_SOURCE_DIR}/include
   )
   add_subdirectory(pybind)
-  target_link_libraries(_core PRIVATE hdf5_io_py)
+  target_link_libraries(_core PRIVATE tenpy_hdf5_py)
 
   if(DEFINED ENV{CONDA_PREFIX} AND NOT "$ENV{CONDA_PREFIX}" STREQUAL "")
     set_target_properties(_core PROPERTIES
@@ -183,13 +183,13 @@ endif()
 # #####################################################################
 # ## Install / export (core)
 # #####################################################################
-install(TARGETS hdf5_io_core
-  EXPORT hdf5_ioTargets
+install(TARGETS tenpy_hdf5_core
+  EXPORT tenpy_hdf5Targets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
-install(DIRECTORY include/hdf5_io
+install(DIRECTORY include/tenpy_hdf5
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   FILES_MATCHING
     PATTERN "constants.h"
@@ -198,26 +198,26 @@ install(DIRECTORY include/hdf5_io
     PATTERN "core_io.h"
 )
 
-install(EXPORT hdf5_ioTargets
-  FILE hdf5_ioTargets.cmake
-  NAMESPACE hdf5_io::
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hdf5_io
+install(EXPORT tenpy_hdf5Targets
+  FILE tenpy_hdf5Targets.cmake
+  NAMESPACE tenpy_hdf5::
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/tenpy_hdf5
 )
 
 configure_package_config_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hdf5_ioConfig.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/hdf5_ioConfig.cmake
-  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hdf5_io
+  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/tenpy_hdf5Config.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/tenpy_hdf5Config.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/tenpy_hdf5
 )
 write_basic_package_version_file(
-  ${CMAKE_CURRENT_BINARY_DIR}/hdf5_ioConfigVersion.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/tenpy_hdf5ConfigVersion.cmake
   VERSION ${PROJECT_VERSION}
   COMPATIBILITY SameMajorVersion
 )
 install(FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/hdf5_ioConfig.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/hdf5_ioConfigVersion.cmake
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hdf5_io
+  ${CMAKE_CURRENT_BINARY_DIR}/tenpy_hdf5Config.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/tenpy_hdf5ConfigVersion.cmake
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/tenpy_hdf5
 )
 
 # #####################################################################

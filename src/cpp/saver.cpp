@@ -1,10 +1,10 @@
-#include <hdf5_io/h5_bridge.h>
-#include <hdf5_io/hdf5_io.h>
+#include <tenpy_hdf5/h5_bridge.h>
+#include <tenpy_hdf5/tenpy_hdf5.h>
 
 #include <cstdint>
 #include <utility>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 namespace {
 
@@ -449,4 +449,4 @@ Hdf5Saver::save_global(py::object obj, std::string const& path, std::string cons
     return id;
 }
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

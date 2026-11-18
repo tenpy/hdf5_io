@@ -1,7 +1,7 @@
-#include "py_hdf5_io.h"
+#include "py_tenpy_hdf5.h"
 
 NB_MODULE(_core, m)
 {
-    m.doc() = "C++ hdf5_io bindings (TeNPy HDF5 format)";
-    hdf5_io::bind_hdf5_io(m);
+    m.doc() = "C++ tenpy_hdf5 bindings (TeNPy HDF5 format)";
+    tenpy_hdf5::bind_tenpy_hdf5(m);
 }

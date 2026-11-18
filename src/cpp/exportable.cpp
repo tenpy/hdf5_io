@@ -1,7 +1,7 @@
-#include <hdf5_io/h5_bridge.h>
-#include <hdf5_io/hdf5_io.h>
+#include <tenpy_hdf5/h5_bridge.h>
+#include <tenpy_hdf5/tenpy_hdf5.h>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 Hdf5Ignored::Hdf5Ignored(std::string name_)
   : name(std::move(name_))
@@ -34,4 +34,4 @@ Hdf5Exportable::from_hdf5(py::object cls,
     return obj;
 }
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

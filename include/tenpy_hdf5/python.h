@@ -1,8 +1,8 @@
 #pragma once
 
-/// Python/nanobind glue shared by the Python-facing part of hdf5_io.
+/// Python/nanobind glue shared by the Python-facing part of tenpy_hdf5.
 ///
-/// This header must never be included from the Python-free ``hdf5_io_core`` sources.
+/// This header must never be included from the Python-free ``tenpy_hdf5_core`` sources.
 /// The module is built against the Python stable ABI (``Py_LIMITED_API``), so numpy is only
 /// accessed through its Python-level API and the buffer protocol (no NumPy C API).
 
@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 namespace py = nanobind;
 
@@ -153,4 +153,4 @@ class NumpyArray : public py::object
     void* mutable_data() { return buffer_ptr(ptr(), PyBUF_WRITABLE); }
 };
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

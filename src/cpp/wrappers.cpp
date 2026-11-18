@@ -1,6 +1,6 @@
-#include <hdf5_io/hdf5_io.h>
+#include <tenpy_hdf5/tenpy_hdf5.h>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 void
 save(py::object data, std::string filename, std::string mode)
@@ -243,4 +243,4 @@ init_dispatch_tables(py::module_& m)
     loader_cls.attr("dispatch_load") = dispatch_load;
 }
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

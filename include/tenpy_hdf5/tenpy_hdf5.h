@@ -1,8 +1,8 @@
 #pragma once
 
-#include <hdf5_io/constants.h>
-#include <hdf5_io/exceptions.h>
-#include <hdf5_io/python.h>
+#include <tenpy_hdf5/constants.h>
+#include <tenpy_hdf5/exceptions.h>
+#include <tenpy_hdf5/python.h>
 #include <highfive/highfive.hpp>
 #include <cstdint>
 #include <string>
@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 bool valid_hdf5_path_component(py::handle name);
 py::object find_global(std::string const& module, std::string const& qualified_name);
@@ -155,4 +155,4 @@ py::object load_from_hdf5(py::object h5group,
 /// Fill Hdf5Saver.dispatch_save and Hdf5Loader.dispatch_load after nanobind class registration.
 void init_dispatch_tables(py::module_& m);
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

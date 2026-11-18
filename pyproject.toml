@@ -40,7 +40,7 @@ wheel.py-api = "cp312"
 
 [tool.scikit-build.cmake.define]
 BUILD_TESTING = {env = "BUILD_TESTING", default = "ON"}
-HDF5_IO_BUILD_PYTHON = {env = "HDF5_IO_BUILD_PYTHON", default = "ON"}
+TENPY_HDF5_BUILD_PYTHON = {env = "TENPY_HDF5_BUILD_PYTHON", default = "ON"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,9 +1,9 @@
-#include "py_hdf5_io.h"
+#include "py_tenpy_hdf5.h"
 
 #include <hdf5.h>
-#include <hdf5_io/h5_bridge.h>
+#include <tenpy_hdf5/h5_bridge.h>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 class PyHdf5Exportable : public Hdf5Exportable
 {
@@ -17,7 +17,7 @@ class PyHdf5Exportable : public Hdf5Exportable
 };
 
 void
-bind_hdf5_io(py::module_& m)
+bind_tenpy_hdf5(py::module_& m)
 {
     // Translators are tried newest first, so register the base class before its subclasses.
     py::exception<Hdf5FormatError> format_err(m, "Hdf5FormatError", PyExc_Exception);
@@ -453,4 +453,4 @@ bind_hdf5_io(py::module_& m)
     init_dispatch_tables(m);
 }
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5
