@@ -149,8 +149,14 @@ wrap_group(py::handle obj)
     if (is_h5py_file(obj)) {
         hid_t fid = hid_from_h5py(obj);
         hid_t gid = H5Gopen2(fid, "/", H5P_DEFAULT);
-        if (gid < 0)
-            throw Hdf5ExportError("failed to open root group");
+        if (gid < 0) {
+            throw Hdf5ExportError(
+              "failed to open root group (invalid HDF5 identifier). "
+              "tenpy_hdf5 and h5py must link the same libhdf5; pip h5py wheels "
+              "vendor a separate HDF5. Prefer conda-forge hdf5+h5py, or "
+              "`pip install --no-binary=h5py h5py` against the libhdf5 used to "
+              "build tenpy-hdf5.");
+        }
         return HighFive::detail::make_group(gid);
     }
     hid_t hid = hid_from_h5py(obj);

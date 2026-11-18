@@ -14,6 +14,10 @@ jobs:
     timeout-minutes: 60
     env:
       PY_COLORS: 1
+    defaults:
+      run:
+        # micromamba activates the env for every `run` step
+        shell: bash -el {0}
 
     strategy:
       fail-fast: false
@@ -24,20 +28,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - name: Set up micromamba
+        uses: mamba-org/setup-micromamba@v3
         with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libhdf5-dev
+          environment-file: environment.yml
+          create-args: >-
+            python=${{ matrix.python-version }}
+          cache-environment: true
 
       - name: Build and install
         run: |
+          # conda-forge hdf5 + h5py share one libhdf5; HIDs from h5py are then
+          # valid in the C++ extension (pip h5py wheels vendor a different HDF5).
           python -m pip install --upgrade pip
-          pip install -e ".[test]"
+          python -m pip install --no-build-isolation -e ".[test]"
 
       - name: Run pytest
         run: |

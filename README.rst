@@ -39,6 +39,13 @@ Requirements: Python >= 3.12, numpy, h5py, HDF5 development libraries, CMake, na
 HighFive is fetched automatically via CMake if not installed system-wide.
 Wheels use the Python Stable ABI (``cp312``); see ``.github/workflows/publish.yml``.
 
+**Same libhdf5 as h5py.** The C++ bindings take raw HDF5 identifiers from h5py
+``File``/``Group`` objects, so ``tenpy_hdf5`` and ``h5py`` must be linked against the
+*same* ``libhdf5``. Pip ``h5py`` wheels vendor their own HDF5 and will not work with an
+extension built against system/conda HDF5. Prefer the conda-forge stack in
+``environment.yml``, or build h5py against that same library
+(``pip install --no-binary=h5py h5py``).
+
 Tests::
 
     pytest tests/

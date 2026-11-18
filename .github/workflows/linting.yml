@@ -21,8 +21,9 @@ jobs:
 
       - name: Install lint dependencies
         run: |
+          # Lint tools only — do not build the C++ extension (needs libhdf5-dev).
           python -m pip install --upgrade pip
-          python -m pip install -e ".[lint]"
+          python -m pip install ruff flake8 flake8-rst-docstrings sphinx-lint
 
       - name: Lint python code
         run: |
