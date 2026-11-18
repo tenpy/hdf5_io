@@ -1,9 +1,6 @@
 #include <hdf5_io/h5_bridge.h>
 #include <hdf5_io/hdf5_io.h>
 
-#include <pybind11/numpy.h>
-#include <pybind11/stl.h>
-
 #include <cstdint>
 #include <utility>
 
@@ -14,13 +11,13 @@ namespace {
 std::uint64_t
 py_id(py::handle obj)
 {
-    return py::module_::import("builtins").attr("id")(obj).cast<std::uint64_t>();
+    return py::cast<std::uint64_t>(py::module_::import_("builtins").attr("id")(obj));
 }
 
 py::object
 self_obj(Hdf5Saver* self)
 {
-    return py::cast(self, py::return_value_policy::reference);
+    return py::cast(self, py::rv_policy::reference);
 }
 
 std::string
@@ -38,7 +35,7 @@ Hdf5Saver::Hdf5Saver(py::object h5group_, py::object format_selection_)
     if (format_selection_.is_none())
         format_selection = py::dict();
     else
-        format_selection = py::reinterpret_borrow<py::dict>(format_selection_);
+        format_selection = py::borrow<py::dict>(format_selection_);
 }
 
 Hdf5Saver::~Hdf5Saver()
@@ -61,7 +58,7 @@ Hdf5Saver::memo_save() const
 py::dict
 Hdf5Saver::dispatch_save() const
 {
-    return py::type::of<Hdf5Saver>().attr("dispatch_save");
+    return py::borrow<py::dict>(py::type<Hdf5Saver>().attr("dispatch_save"));
 }
 
 py::object
@@ -90,7 +87,7 @@ Hdf5Saver::save_hid(py::object obj, std::string path)
     if (cpp_it != cpp_disp.end())
         return (this->*(cpp_it->second.first))(obj, path, cpp_it->second.second);
 
-    py::object disp = dispatch_save().attr("get")(py::type::of(obj));
+    py::object disp = dispatch_save().attr("get")(obj.type());
     if (!disp.is_none()) {
         py::object f = disp[py::int_(0)];
         py::object type_repr = disp[py::int_(1)];
@@ -106,8 +103,8 @@ Hdf5Saver::save_hid(py::object obj, std::string path)
     if (!obj_save_hdf5.is_none()) {
         auto [group, subpath] = create_group_for_obj(path, obj);
         h5_set_attr(group.getId(), ATTR_TYPE, std::string(REPR_HDF5EXPORTABLE));
-        h5_set_attr(group.getId(), ATTR_CLASS, obj.attr("__class__").attr("__qualname__").cast<std::string>());
-        h5_set_attr(group.getId(), ATTR_MODULE, obj.attr("__class__").attr("__module__").cast<std::string>());
+        h5_set_attr(group.getId(), ATTR_CLASS, py::cast<std::string>(obj.attr("__class__").attr("__qualname__")));
+        h5_set_attr(group.getId(), ATTR_MODULE, py::cast<std::string>(obj.attr("__class__").attr("__module__")));
         py::object h5gr = h5py_from_hid(group.getId());
         obj_save_hdf5(self_obj(this), h5gr, subpath);
         hid_t id = group.getId();
@@ -115,11 +112,11 @@ Hdf5Saver::save_hid(py::object obj, std::string path)
         return id;
     }
 
-    py::module_::import("warnings")
+    py::module_::import_("warnings")
       .attr("warn")(py::str("Hdf5Saver: object of type {0!r} without explicit HDF5 format; "
                             "fall back to pickle protocol")
-                      .attr("format")(py::type::of(obj)),
-                    py::module_::import("builtins").attr("UserWarning"));
+                      .attr("format")(obj.type()),
+                    py::module_::import_("builtins").attr("UserWarning"));
 
     py::object obj_reduce = py::getattr(obj, "__reduce__", py::none());
     if (!obj_reduce.is_none()) {
@@ -128,7 +125,7 @@ Hdf5Saver::save_hid(py::object obj, std::string path)
             return save_global(obj, path, REPR_GLOBAL);
         if (!py::isinstance<py::tuple>(rv))
             throw Hdf5ExportError("Wrong return value of reduce");
-        py::tuple tup = py::reinterpret_borrow<py::tuple>(rv);
+        py::tuple tup = py::borrow<py::tuple>(rv);
         if (tup.size() < 2 || tup.size() >= 7)
             throw Hdf5ExportError("Wrong return value of reduce");
         py::object func = tup[0];
@@ -138,14 +135,14 @@ Hdf5Saver::save_hid(py::object obj, std::string path)
         py::object dictitems = tup.size() > 4 ? tup[4] : py::none();
         py::object state_setter = tup.size() > 5 ? tup[5] : py::none();
         py::object pygr = save_reduce(
-          func, args, state, listitems, dictitems, state_setter, obj, py::str(path));
+          func, args, state, listitems, dictitems, state_setter, obj, to_str(path));
         hid_t id = hid_from_h5py(pygr);
         H5Iinc_ref(id);
         return id;
     }
 
     throw Hdf5ExportError("Don't know how to save object of type " +
-                          py::repr(py::type::of(obj)).cast<std::string>());
+                          py::cast<std::string>(py::repr(obj.type())));
 }
 
 std::pair<HighFive::Group, std::string>
@@ -190,7 +187,7 @@ Hdf5Saver::save_reduce(py::object func,
                        py::object obj,
                        py::object path)
 {
-    std::string p = path.is_none() ? std::string("/") : path.cast<std::string>();
+    std::string p = path.is_none() ? std::string("/") : py::cast<std::string>(path);
     auto [group, subpath] = create_group_for_obj(p, obj);
     h5_set_attr(group.getId(), ATTR_TYPE, std::string(REPR_REDUCE));
     save_hid(func, subpath + "func");
@@ -221,7 +218,7 @@ hid_t
 Hdf5Saver::save_dataset(py::object obj, std::string const& path, std::string const& type_repr)
 {
     std::string repr = type_repr;
-    py::module_ np = py::module_::import("numpy");
+    py::module_ np = py::module_::import_("numpy");
     auto write_int = [&]() {
         int overflow = 0;
         long long v = PyLong_AsLongLongAndOverflow(obj.ptr(), &overflow);
@@ -241,44 +238,44 @@ Hdf5Saver::save_dataset(py::object obj, std::string const& path, std::string con
 
     try {
         if (repr == REPR_ARRAY)
-            h5_write_dataset(native_group, path, py::reinterpret_borrow<py::array>(obj));
+            h5_write_dataset(native_group, path, py::borrow<NumpyArray>(obj));
         else if (repr == REPR_STR)
-            h5_write_dataset(native_group, path, obj.cast<std::string>());
+            h5_write_dataset(native_group, path, py::cast<std::string>(obj));
         else if (repr == REPR_BYTES)
-            h5_write_dataset(native_group, path, py::reinterpret_borrow<py::bytes>(obj));
+            h5_write_dataset(native_group, path, py::borrow<py::bytes>(obj));
         else if (repr == REPR_BOOL)
             h5_write_dataset(native_group, path, PyObject_IsTrue(obj.ptr()) != 0);
         else if (repr == REPR_INT)
             write_int();
         else if (repr == REPR_FLOAT)
-            h5_write_dataset(native_group, path, obj.cast<double>());
+            h5_write_dataset(native_group, path, py::cast<double>(obj));
         else if (repr == REPR_COMPLEX)
             h5_write_dataset(native_group,
                              path,
                              std::complex<double>(PyComplex_RealAsDouble(obj.ptr()),
                                                   PyComplex_ImagAsDouble(obj.ptr())));
         else
-            h5_write_dataset(native_group, path, np.attr("asarray")(obj).cast<py::array>());
-    } catch (py::error_already_set& e) {
+            h5_write_dataset(native_group, path, NumpyArray::from_object(np.attr("asarray")(obj)));
+    } catch (py::python_error& e) {
         if (repr != REPR_INT || !e.matches(PyExc_TypeError))
             throw;
         std::string msg = e.what();
         if (msg.find("no native HDF5 equivalent") == std::string::npos)
             throw;
         repr = REPR_INT_AS_STR;
-        h5_write_dataset(native_group, path, obj.attr("__str__")().cast<std::string>());
+        h5_write_dataset(native_group, path, py::cast<std::string>(obj.attr("__str__")()));
     } catch (Hdf5ExportError const& e) {
         if (repr != REPR_INT ||
             std::string(e.what()).find("no native HDF5 equivalent") == std::string::npos)
             throw;
         repr = REPR_INT_AS_STR;
-        h5_write_dataset(native_group, path, obj.attr("__str__")().cast<std::string>());
-    } catch (py::type_error const& e) {
-        if (repr != REPR_INT ||
+        h5_write_dataset(native_group, path, py::cast<std::string>(obj.attr("__str__")()));
+    } catch (py::builtin_exception const& e) {
+        if (repr != REPR_INT || e.type() != py::exception_type::type_error ||
             std::string(e.what()).find("no native HDF5 equivalent") == std::string::npos)
             throw;
         repr = REPR_INT_AS_STR;
-        h5_write_dataset(native_group, path, obj.attr("__str__")().cast<std::string>());
+        h5_write_dataset(native_group, path, py::cast<std::string>(obj.attr("__str__")()));
     }
     hid_t id = h5_open(native_group, path);
     h5_set_attr(id, ATTR_TYPE, repr);
@@ -291,15 +288,15 @@ Hdf5Saver::save_masked_array(py::object obj, std::string const& path, std::strin
 {
     py::object filled = obj.attr("filled")();
     py::object fill_value = obj.attr("fill_value");
-    py::object np = py::module_::import("numpy");
+    py::object np = py::module_::import_("numpy");
     py::object mask = obj.attr("mask");
     py::object cmp = filled.attr("__eq__")(fill_value);
     py::object mask_cmp = cmp.attr("__eq__")(mask);
     hid_t id;
-    if (np.attr("any")(mask_cmp).cast<bool>()) {
+    if (truthy(np.attr("any")(mask_cmp))) {
         auto created = create_group_for_obj(path, obj);
-        h5_write_dataset(created.first, "data", obj.attr("data").cast<py::array>());
-        h5_write_dataset(created.first, "mask", obj.attr("mask").cast<py::array>());
+        h5_write_dataset(created.first, "data", NumpyArray::from_object(obj.attr("data")));
+        h5_write_dataset(created.first, "mask", NumpyArray::from_object(obj.attr("mask")));
         h5_set_attr(created.first.getId(), "saved_mask", true);
         id = created.first.getId();
         H5Iinc_ref(id);
@@ -307,7 +304,7 @@ Hdf5Saver::save_masked_array(py::object obj, std::string const& path, std::strin
         h5_set_attr(id, "fill_value", fill_value);
         return id;
     }
-    h5_write_dataset(native_group, path, filled.cast<py::array>());
+    h5_write_dataset(native_group, path, NumpyArray::from_object(filled));
     id = h5_open(native_group, path);
     h5_set_attr(id, "saved_mask", false);
     memorize_save(id, obj);
@@ -330,11 +327,11 @@ Hdf5Saver::save_iterable(py::object obj, std::string const& path, std::string co
 void
 Hdf5Saver::save_iterable_content(py::object obj, HighFive::Group& h5gr, std::string const& subpath)
 {
-    py::ssize_t n = py::len(obj);
+    Py_ssize_t n = py::len(obj);
     h5_set_attr(h5gr.getId(), ATTR_LEN, static_cast<std::int64_t>(n));
-    py::ssize_t i = 0;
+    Py_ssize_t i = 0;
     for (auto elem : obj) {
-        hid_t child = save_hid(py::reinterpret_borrow<py::object>(elem), subpath + std::to_string(i));
+        hid_t child = save_hid(py::borrow<py::object>(elem), subpath + std::to_string(i));
         if (child >= 0)
             H5Idec_ref(child);
         ++i;
@@ -366,8 +363,8 @@ Hdf5Saver::save_dict_content(py::object obj, HighFive::Group& h5gr, std::string 
     }
     if (simple_keys) {
         for (auto item : obj.attr("items")()) {
-            py::tuple kv = py::reinterpret_borrow<py::tuple>(item);
-            hid_t child = save_hid(kv[1], subpath + kv[0].cast<std::string>());
+            py::tuple kv = py::borrow<py::tuple>(item);
+            hid_t child = save_hid(kv[1], subpath + py::cast<std::string>(kv[0]));
             if (child >= 0)
                 H5Idec_ref(child);
         }
@@ -430,12 +427,12 @@ Hdf5Saver::save_ignored(py::object obj, std::string const& path, std::string con
 hid_t
 Hdf5Saver::save_global(py::object obj, std::string const& path, std::string const& type_repr)
 {
-    std::string module = obj.attr("__module__").cast<std::string>();
-    std::string qualname = obj.attr("__qualname__").cast<std::string>();
+    std::string module = py::cast<std::string>(obj.attr("__module__"));
+    std::string qualname = py::cast<std::string>(obj.attr("__qualname__"));
     py::object obj2;
     try {
         obj2 = find_global(module, qualname);
-    } catch (py::error_already_set const&) {
+    } catch (py::python_error const&) {
         throw Hdf5ExportError("Can't export object: it's not found as " + qualname +
                               " in module " + module);
     }

@@ -1,6 +1,6 @@
 #pragma once
 
-/// Python-free HDF5/HighFive helpers used by hdf5_io_core and the pybind bridge.
+/// Python-free HDF5/HighFive helpers used by hdf5_io_core and the nanobind bridge.
 
 #include <hdf5_io/exceptions.h>
 

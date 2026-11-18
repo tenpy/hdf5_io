@@ -1,17 +1,15 @@
 #include <hdf5_io/hdf5_io.h>
 
-#include <pybind11/pybind11.h>
-
 namespace hdf5_io {
 
 void
 save(py::object data, std::string filename, std::string mode)
 {
     if (filename.ends_with(".pkl")) {
-        py::object f = py::module_::import("builtins").attr("open")(filename, mode + "b");
+        py::object f = py::module_::import_("builtins").attr("open")(filename, mode + "b");
         py::object closer = f.attr("__enter__")();
         try {
-            py::module_::import("pickle").attr("dump")(data, closer);
+            py::module_::import_("pickle").attr("dump")(data, closer);
             f.attr("__exit__")(py::none(), py::none(), py::none());
         } catch (...) {
             f.attr("__exit__")(py::none(), py::none(), py::none());
@@ -20,10 +18,10 @@ save(py::object data, std::string filename, std::string mode)
         return;
     }
     if (filename.ends_with(".pklz")) {
-        py::object f = py::module_::import("gzip").attr("open")(filename, mode + "b");
+        py::object f = py::module_::import_("gzip").attr("open")(filename, mode + "b");
         py::object closer = f.attr("__enter__")();
         try {
-            py::module_::import("pickle").attr("dump")(data, closer);
+            py::module_::import_("pickle").attr("dump")(data, closer);
             f.attr("__exit__")(py::none(), py::none(), py::none());
         } catch (...) {
             f.attr("__exit__")(py::none(), py::none(), py::none());
@@ -32,7 +30,7 @@ save(py::object data, std::string filename, std::string mode)
         return;
     }
     if (filename.ends_with(".hdf5") || filename.ends_with(".h5")) {
-        py::object File = py::module_::import("h5py").attr("File");
+        py::object File = py::module_::import_("h5py").attr("File");
         py::object f = File(filename, mode);
         py::object closer = f.attr("__enter__")();
         try {
@@ -51,11 +49,11 @@ py::object
 load(std::string filename)
 {
     if (filename.ends_with(".pkl")) {
-        py::object f = py::module_::import("builtins").attr("open")(filename, "rb");
+        py::object f = py::module_::import_("builtins").attr("open")(filename, "rb");
         py::object closer = f.attr("__enter__")();
         py::object data;
         try {
-            data = py::module_::import("pickle").attr("load")(closer);
+            data = py::module_::import_("pickle").attr("load")(closer);
             f.attr("__exit__")(py::none(), py::none(), py::none());
         } catch (...) {
             f.attr("__exit__")(py::none(), py::none(), py::none());
@@ -64,11 +62,11 @@ load(std::string filename)
         return data;
     }
     if (filename.ends_with(".pklz")) {
-        py::object f = py::module_::import("gzip").attr("open")(filename, "rb");
+        py::object f = py::module_::import_("gzip").attr("open")(filename, "rb");
         py::object closer = f.attr("__enter__")();
         py::object data;
         try {
-            data = py::module_::import("pickle").attr("load")(closer);
+            data = py::module_::import_("pickle").attr("load")(closer);
             f.attr("__exit__")(py::none(), py::none(), py::none());
         } catch (...) {
             f.attr("__exit__")(py::none(), py::none(), py::none());
@@ -77,7 +75,7 @@ load(std::string filename)
         return data;
     }
     if (filename.ends_with(".hdf5") || filename.ends_with(".h5")) {
-        py::object File = py::module_::import("h5py").attr("File");
+        py::object File = py::module_::import_("h5py").attr("File");
         py::object f = File(filename, "r");
         py::object closer = f.attr("__enter__")();
         py::object data;
@@ -127,9 +125,9 @@ init_dispatch_tables(py::module_& m)
     py::object loader_cls = m.attr("Hdf5Loader");
     py::dict dispatch_save;
     py::dict dispatch_load;
-    py::module_ np = py::module_::import("numpy");
-    py::module_ builtins = py::module_::import("builtins");
-    py::module_ types = py::module_::import("types");
+    py::module_ np = py::module_::import_("numpy");
+    py::module_ builtins = py::module_::import_("builtins");
+    py::module_ types = py::module_::import_("types");
 
     auto add_save = [&](py::object ty, py::object method, char const* repr, SaveMethod cpp_fn) {
         dispatch_save[ty] = py::make_tuple(method, py::str(repr));
@@ -140,7 +138,7 @@ init_dispatch_tables(py::module_& m)
         cpp_load_dispatch()[repr] = cpp_fn;
     };
 
-    add_save(py::type::of(py::none()), saver_cls.attr("save_none"), REPR_NONE, &Hdf5Saver::save_none);
+    add_save(py::borrow(py::none().type()), saver_cls.attr("save_none"), REPR_NONE, &Hdf5Saver::save_none);
 
     py::list types_for_datasets;
     auto add_dataset = [&](py::object ty, char const* repr) {
@@ -180,11 +178,11 @@ init_dispatch_tables(py::module_& m)
 
     py::object dtype_type = np.attr("dtype");
     for (auto t : dtype_type.attr("__subclasses__")()) {
-        py::object ty = py::reinterpret_borrow<py::object>(t);
-        std::string name = ty.attr("__name__").cast<std::string>();
+        py::object ty = py::borrow<py::object>(t);
+        std::string name = py::cast<std::string>(ty.attr("__name__"));
         if (!name.empty() && name.front() == '_') {
             for (auto t2 : ty.attr("__subclasses__")())
-                add_save(py::reinterpret_borrow<py::object>(t2),
+                add_save(py::borrow<py::object>(t2),
                          saver_cls.attr("save_dtype"),
                          REPR_DTYPE,
                          &Hdf5Saver::save_dtype);
@@ -203,9 +201,10 @@ init_dispatch_tables(py::module_& m)
              REPR_FUNCTION,
              &Hdf5Saver::save_global);
     add_save(builtins.attr("type"), saver_cls.attr("save_global"), REPR_CLASS, &Hdf5Saver::save_global);
-    py::object pybind11_type = builtins.attr("type")(saver_cls);
-    if (!pybind11_type.is(builtins.attr("type")))
-        add_save(pybind11_type, saver_cls.attr("save_global"), REPR_CLASS, &Hdf5Saver::save_global);
+    // Bound classes use nanobind's metaclass instead of plain ``type``.
+    py::object nb_meta_type = builtins.attr("type")(saver_cls);
+    if (!nb_meta_type.is(builtins.attr("type")))
+        add_save(nb_meta_type, saver_cls.attr("save_global"), REPR_CLASS, &Hdf5Saver::save_global);
 
     add_load(REPR_NONE, loader_cls.attr("load_none"), py::none(), &Hdf5Loader::load_none);
     add_load(REPR_STR, loader_cls.attr("load_str"), builtins.attr("str"), &Hdf5Loader::load_str);

@@ -2,17 +2,15 @@
 
 #include <hdf5_io/constants.h>
 #include <hdf5_io/exceptions.h>
+#include <hdf5_io/python.h>
 #include <highfive/highfive.hpp>
-#include <pybind11/pybind11.h>
-#include <Python.h>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 namespace hdf5_io {
-
-namespace py = pybind11;
 
 bool valid_hdf5_path_component(py::handle name);
 py::object find_global(std::string const& module, std::string const& qualified_name);
@@ -28,7 +26,7 @@ class Hdf5Exportable
 
     virtual void save_hdf5(py::object hdf5_saver, py::object h5gr, std::string subpath);
 
-    static py::object from_hdf5(py::type cls,
+    static py::object from_hdf5(py::object cls,
                                 py::object hdf5_loader,
                                 py::object h5gr,
                                 std::string subpath);
@@ -154,7 +152,7 @@ py::object load_from_hdf5(py::object h5group,
                           bool ignore_unknown = true,
                           py::object exclude = py::none());
 
-/// Fill Hdf5Saver.dispatch_save and Hdf5Loader.dispatch_load after pybind class registration.
+/// Fill Hdf5Saver.dispatch_save and Hdf5Loader.dispatch_load after nanobind class registration.
 void init_dispatch_tables(py::module_& m);
 
 } // namespace hdf5_io

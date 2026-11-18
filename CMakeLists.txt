@@ -1,6 +1,6 @@
 message(STATUS "")
 message(STATUS "------------------------------------------------------------------------")
-message(STATUS " Project hdf5_io, HDF5 import/export with pybind11 bindings ")
+message(STATUS " Project hdf5_io, HDF5 import/export with nanobind bindings ")
 message(STATUS "------------------------------------------------------------------------")
 message(STATUS "")
 
@@ -18,9 +18,9 @@ option(BUILD_TESTING "Build ctest tests" ON)
 option(LINTING "Use clang-tidy for linting" OFF)
 # Default ON for scikit-build / pip installs; OFF when embedding as a C++ dependency.
 if(DEFINED SKBUILD)
-  option(HDF5_IO_BUILD_PYTHON "Build pybind11 module and Python-facing library" ON)
+  option(HDF5_IO_BUILD_PYTHON "Build nanobind module and Python-facing library" ON)
 else()
-  option(HDF5_IO_BUILD_PYTHON "Build pybind11 module and Python-facing library" ON)
+  option(HDF5_IO_BUILD_PYTHON "Build nanobind module and Python-facing library" ON)
 endif()
 
 project(
@@ -95,14 +95,31 @@ endif()
 add_library(hdf5_io::core ALIAS hdf5_io_core)
 
 # #####################################################################
-# ## Python / pybind11 (optional)
+# ## Python / nanobind (optional)
 # #####################################################################
 if(HDF5_IO_BUILD_PYTHON)
   set(Python_FIND_VIRTUALENV ONLY)
   set(Python_FIND_STRATEGY LOCATION)
-  find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
-  find_package(pybind11 CONFIG REQUIRED)
+  find_package(Python REQUIRED COMPONENTS Interpreter Development.Module Development.SABIModule)
+  if(NOT nanobind_DIR)
+    execute_process(
+      COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      OUTPUT_VARIABLE nanobind_ROOT
+      ERROR_QUIET
+    )
+  endif()
+  find_package(nanobind CONFIG REQUIRED)
   cmake_print_variables(Python_VERSION)
+
+  # Stable ABI (abi3, Python >= 3.12). Mirrors the conditions under which nanobind honors
+  # STABLE_ABI; hdf5_io_py has to be compiled with the same Py_LIMITED_API as the module.
+  set(HDF5_IO_STABLE_ABI OFF)
+  if(TARGET Python::SABIModule
+     AND Python_VERSION VERSION_GREATER_EQUAL "3.12"
+     AND NOT NB_ABI MATCHES "[0-9]t")
+    set(HDF5_IO_STABLE_ABI ON)
+  endif()
 
   add_library(hdf5_io_py STATIC)
   set_property(TARGET hdf5_io_py PROPERTY C_VISIBILITY_PRESET hidden)
@@ -129,18 +146,29 @@ if(HDF5_IO_BUILD_PYTHON)
     src/cpp/wrappers.cpp
   )
 
-  target_link_libraries(hdf5_io_py PUBLIC hdf5_io_core pybind11::pybind11)
+  # nanobind headers (header-only part) + Python headers; the nanobind library itself is
+  # linked into _core by nanobind_add_module().
+  target_include_directories(hdf5_io_py SYSTEM PUBLIC ${NB_DIR}/include)
+  target_link_libraries(hdf5_io_py PUBLIC hdf5_io_core Python::Module)
+  target_compile_features(hdf5_io_py PUBLIC cxx_std_17)
+  if(HDF5_IO_STABLE_ABI)
+    target_compile_definitions(hdf5_io_py PUBLIC Py_LIMITED_API=0x030C0000)
+  endif()
 
   # Back-compat alias for older link lines.
   add_library(hdf5_io ALIAS hdf5_io_py)
 
-  pybind11_add_module(_core pybind/_core.cpp)
+  if(HDF5_IO_STABLE_ABI)
+    nanobind_add_module(_core STABLE_ABI pybind/_core.cpp)
+  else()
+    nanobind_add_module(_core pybind/_core.cpp)
+  endif()
   target_include_directories(_core
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pybind
     PUBLIC ${PROJECT_SOURCE_DIR}/include
   )
   add_subdirectory(pybind)
-  target_link_libraries(_core PUBLIC hdf5_io_py)
+  target_link_libraries(_core PRIVATE hdf5_io_py)
 
   if(DEFINED ENV{CONDA_PREFIX} AND NOT "$ENV{CONDA_PREFIX}" STREQUAL "")
     set_target_properties(_core PROPERTIES

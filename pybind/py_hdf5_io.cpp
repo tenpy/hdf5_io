@@ -3,34 +3,30 @@
 #include <hdf5.h>
 #include <hdf5_io/h5_bridge.h>
 
-#include <pybind11/operators.h>
-#include <pybind11/stl.h>
-
 namespace hdf5_io {
 
-class PyHdf5Exportable
-  : public Hdf5Exportable
-  , public py::trampoline_self_life_support
+class PyHdf5Exportable : public Hdf5Exportable
 {
   public:
-    using Hdf5Exportable::Hdf5Exportable;
+    NB_TRAMPOLINE(Hdf5Exportable, 1);
 
     void save_hdf5(py::object hdf5_saver, py::object h5gr, std::string subpath) override
     {
-        PYBIND11_OVERRIDE(void, Hdf5Exportable, save_hdf5, hdf5_saver, h5gr, subpath);
+        NB_OVERRIDE(save_hdf5, hdf5_saver, h5gr, subpath);
     }
 };
 
 void
 bind_hdf5_io(py::module_& m)
 {
-    auto& format_err =
-      py::register_exception<Hdf5FormatError>(m, "Hdf5FormatError", PyExc_Exception);
-    format_err.doc() = "Common base class for errors regarding our HDF5 format.";
-    auto& export_err = py::register_exception<Hdf5ExportError>(m, "Hdf5ExportError", format_err);
-    export_err.doc() = "This exception is raised when something went wrong during export to hdf5.";
-    auto& import_err = py::register_exception<Hdf5ImportError>(m, "Hdf5ImportError", format_err);
-    import_err.doc() =
+    // Translators are tried newest first, so register the base class before its subclasses.
+    py::exception<Hdf5FormatError> format_err(m, "Hdf5FormatError", PyExc_Exception);
+    format_err.attr("__doc__") = "Common base class for errors regarding our HDF5 format.";
+    py::exception<Hdf5ExportError> export_err(m, "Hdf5ExportError", format_err);
+    export_err.attr("__doc__") =
+      "This exception is raised when something went wrong during export to hdf5.";
+    py::exception<Hdf5ImportError> import_err(m, "Hdf5ImportError", format_err);
+    import_err.attr("__doc__") =
       "This exception is raised when something went wrong during import from hdf5.";
 
     m.attr("REPR_IGNORED") = REPR_IGNORED;
@@ -100,35 +96,37 @@ bind_hdf5_io(py::module_& m)
           Load data from file with given `filename`.
           )pydoc");
 
-    py::class_<Hdf5Exportable, PyHdf5Exportable, py::smart_holder> exportable(
-      m, "Hdf5Exportable", py::dynamic_attr());
-    exportable.doc() = R"pydoc(
+    py::class_<Hdf5Exportable, PyHdf5Exportable> exportable(m,
+                                                            "Hdf5Exportable",
+                                                            py::dynamic_attr(),
+                                                            R"pydoc(
         Interface specification for a class to be exportable to our HDF5 format.
 
         To allow a class to be exported to HDF5 with :func:`save_to_hdf5`,
         it only needs to implement the :meth:`save_hdf5` method as documented below.
         To allow import, a class should implement the classmethod :meth:`from_hdf5`.
-        )pydoc";
+        )pydoc");
     exportable.def(py::init<>())
       .def("save_hdf5",
            &Hdf5Exportable::save_hdf5,
            py::arg("hdf5_saver"),
            py::arg("h5gr"),
            py::arg("subpath"));
-    exportable.attr("from_hdf5") = py::module_::import("builtins").attr("classmethod")(py::cpp_function(
-      [](py::type cls, py::object hdf5_loader, py::object h5gr, std::string subpath) {
-          return Hdf5Exportable::from_hdf5(
-            cls, std::move(hdf5_loader), std::move(h5gr), std::move(subpath));
-      },
-      py::name("from_hdf5"),
-      py::arg("cls"),
-      py::arg("hdf5_loader"),
-      py::arg("h5gr"),
-      py::arg("subpath")));
+    exportable.attr("from_hdf5") = py::module_::import_("builtins").attr("classmethod")(
+      py::cpp_function(
+        [](py::object cls, py::object hdf5_loader, py::object h5gr, std::string subpath) {
+            return Hdf5Exportable::from_hdf5(
+              std::move(cls), std::move(hdf5_loader), std::move(h5gr), std::move(subpath));
+        },
+        py::name("from_hdf5"),
+        py::arg("cls"),
+        py::arg("hdf5_loader"),
+        py::arg("h5gr"),
+        py::arg("subpath")));
 
     py::class_<Hdf5Ignored>(m, "Hdf5Ignored")
       .def(py::init<std::string>(), py::arg("name") = "unknown")
-      .def_readwrite("name", &Hdf5Ignored::name);
+      .def_rw("name", &Hdf5Ignored::name);
 
     auto hid_to_py = [](hid_t id) -> py::object {
         if (id < 0)
@@ -138,22 +136,22 @@ bind_hdf5_io(py::module_& m)
         return obj;
     };
     auto type_info_str = [](py::object type_info) {
-        return type_info.is_none() ? std::string() : py::str(type_info).cast<std::string>();
+        return type_info.is_none() ? std::string() : py::cast<std::string>(py::str(type_info));
     };
 
     py::class_<Hdf5Saver>(m, "Hdf5Saver")
       .def(py::init<py::object, py::object>(),
            py::arg("h5group"),
            py::arg("format_selection") = py::none())
-      .def_readwrite("h5group", &Hdf5Saver::h5group)
-      .def_property_readonly("memo_save", &Hdf5Saver::memo_save)
-      .def_readwrite("format_selection", &Hdf5Saver::format_selection)
+      .def_rw("h5group", &Hdf5Saver::h5group)
+      .def_prop_ro("memo_save", &Hdf5Saver::memo_save)
+      .def_rw("format_selection", &Hdf5Saver::format_selection)
       .def("save", &Hdf5Saver::save, py::arg("obj"), py::arg("path") = "/")
       .def(
         "create_group_for_obj",
         [](Hdf5Saver& self, std::string path, py::object obj) {
             auto [group, subpath] = self.create_group_for_obj(path, std::move(obj));
-            return py::make_tuple(h5py_from_hid(group.getId()), py::str(subpath));
+            return py::make_tuple(h5py_from_hid(group.getId()), to_str(subpath));
         },
         py::arg("path"),
         py::arg("obj"))
@@ -267,9 +265,9 @@ bind_hdf5_io(py::module_& m)
            py::arg("h5group"),
            py::arg("ignore_unknown") = true,
            py::arg("exclude") = py::none())
-      .def_readwrite("h5group", &Hdf5Loader::h5group)
-      .def_readwrite("ignore_unknown", &Hdf5Loader::ignore_unknown)
-      .def_property_readonly("memo_load", &Hdf5Loader::memo_load)
+      .def_rw("h5group", &Hdf5Loader::h5group)
+      .def_rw("ignore_unknown", &Hdf5Loader::ignore_unknown)
+      .def_prop_ro("memo_load", &Hdf5Loader::memo_load)
       .def("load", &Hdf5Loader::load, py::arg("path") = py::none())
       .def("memorize_load",
            static_cast<void (Hdf5Loader::*)(py::object, py::object)>(&Hdf5Loader::memorize_load),

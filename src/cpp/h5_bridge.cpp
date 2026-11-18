@@ -4,8 +4,6 @@
 
 #include <hdf5.h>
 #include <highfive/highfive.hpp>
-#include <pybind11/numpy.h>
-#include <pybind11/stl.h>
 
 #include <complex>
 #include <cstdint>
@@ -20,33 +18,25 @@ namespace {
 py::module_
 h5py_mod()
 {
-    return py::module_::import("h5py");
+    return py::module_::import_("h5py");
 }
 
 HighFive::DataSpace
-numpy_space(py::array const& arr)
+numpy_space(NumpyArray const& arr)
 {
     if (arr.ndim() == 0)
         return HighFive::DataSpace(HighFive::DataSpace::DataspaceType::dataspace_scalar);
     std::vector<size_t> dims(static_cast<size_t>(arr.ndim()));
-    for (py::ssize_t i = 0; i < arr.ndim(); ++i)
+    for (Py_ssize_t i = 0; i < arr.ndim(); ++i)
         dims[static_cast<size_t>(i)] = static_cast<size_t>(arr.shape(i));
     return HighFive::DataSpace(dims);
 }
 
-py::array
-as_c_contiguous(py::array arr)
-{
-    if (arr.attr("flags").attr("c_contiguous").cast<bool>())
-        return arr;
-    return py::reinterpret_steal<py::array>(arr.attr("copy")("C").release());
-}
-
 template<typename T>
 void
-write_typed_array(HighFive::Group& group, std::string const& path, py::array arr)
+write_typed_array(HighFive::Group& group, std::string const& path, NumpyArray arr)
 {
-    arr = as_c_contiguous(arr);
+    arr = arr.as_c_contiguous();
     auto space = numpy_space(arr);
     auto dset = group.createDataSet(path, space, HighFive::create_datatype<T>());
     if (arr.size() > 0 || arr.ndim() == 0)
@@ -54,9 +44,9 @@ write_typed_array(HighFive::Group& group, std::string const& path, py::array arr
 }
 
 void
-write_numpy_array(HighFive::Group& group, std::string const& path, py::array arr)
+write_numpy_array(HighFive::Group& group, std::string const& path, NumpyArray arr)
 {
-    py::dtype dt = arr.dtype();
+    NumpyDtype dt = arr.dtype();
     char kind = dt.kind();
     int itemsize = static_cast<int>(dt.itemsize());
     if (kind == 'f' && itemsize == 4)
@@ -83,20 +73,22 @@ write_numpy_array(HighFive::Group& group, std::string const& path, py::array arr
         return write_typed_array<std::uint32_t>(group, path, arr);
     if (kind == 'u' && itemsize == 8)
         return write_typed_array<std::uint64_t>(group, path, arr);
-    if (kind == 'b' || (kind == 'i' && dt.attr("name").cast<std::string>() == "bool"))
+    if (kind == 'b' || (kind == 'i' && dt.name() == "bool"))
         return write_typed_array<std::uint8_t>(group, path, arr);
 
     throw Hdf5ExportError("unsupported numpy dtype for HDF5 dataset: " +
-                          py::str(py::object(dt)).cast<std::string>());
+                          py::cast<std::string>(py::str(dt)));
 }
 
 void
 write_vlen_bytes(hid_t loc, std::string const& path, py::bytes value)
 {
     char* buf = nullptr;
-    py::ssize_t len = 0;
-    if (PYBIND11_BYTES_AS_STRING_AND_SIZE(value.ptr(), &buf, &len) != 0)
+    Py_ssize_t len = 0;
+    if (PyBytes_AsStringAndSize(value.ptr(), &buf, &len) != 0) {
+        PyErr_Clear();
         throw Hdf5ExportError("invalid bytes object");
+    }
     std::string s(buf, static_cast<size_t>(len));
     // ASCII vlen string dataset (same as former bridge)
     hid_t type = H5Tcopy(H5T_C_S1);
@@ -123,7 +115,7 @@ write_vlen_bytes(hid_t loc, std::string const& path, py::bytes value)
 hid_t
 hid_from_h5py(py::handle obj)
 {
-    return obj.attr("id").attr("id").cast<hid_t>();
+    return py::cast<hid_t>(obj.attr("id").attr("id"));
 }
 
 bool
@@ -198,7 +190,7 @@ h5py_from_hid(hid_t hid)
 py::object
 h5py_getitem(py::handle parent, std::string const& path)
 {
-    return parent[py::str(path)];
+    return parent[to_str(path)];
 }
 
 py::object
@@ -217,7 +209,7 @@ h5_hard_link(py::handle parent, std::string const& path, py::handle src)
 }
 
 void
-h5_write_dataset(HighFive::Group& parent, std::string const& path, py::array const& obj)
+h5_write_dataset(HighFive::Group& parent, std::string const& path, NumpyArray const& obj)
 {
     write_numpy_array(parent, normalized_path(path), obj);
 }
@@ -232,18 +224,18 @@ void
 h5_write_dataset(py::handle parent, std::string const& path, py::handle obj)
 {
     auto group = wrap_group(parent);
-    py::module_ np = py::module_::import("numpy");
+    py::module_ np = py::module_::import_("numpy");
     if (py::isinstance(obj, np.attr("ndarray")) &&
         !py::isinstance(obj, np.attr("ma").attr("MaskedArray"))) {
-        h5_write_dataset(group, path, py::reinterpret_borrow<py::array>(obj));
+        h5_write_dataset(group, path, py::borrow<NumpyArray>(obj));
         return;
     }
     if (py::isinstance<py::str>(obj)) {
-        h5_write_dataset(group, path, obj.cast<std::string>());
+        h5_write_dataset(group, path, py::cast<std::string>(obj));
         return;
     }
     if (py::isinstance<py::bytes>(obj)) {
-        h5_write_dataset(group, path, py::reinterpret_borrow<py::bytes>(obj));
+        h5_write_dataset(group, path, py::borrow<py::bytes>(obj));
         return;
     }
     if (obj.ptr() == Py_True || obj.ptr() == Py_False) {
@@ -268,7 +260,7 @@ h5_write_dataset(py::handle parent, std::string const& path, py::handle obj)
                              "and no native HDF5 equivalent");
     }
     if (py::isinstance<py::float_>(obj)) {
-        h5_write_dataset(group, path, obj.cast<double>());
+        h5_write_dataset(group, path, py::cast<double>(obj));
         return;
     }
     if (PyComplex_Check(obj.ptr())) {
@@ -280,7 +272,7 @@ h5_write_dataset(py::handle parent, std::string const& path, py::handle obj)
     }
     if (py::isinstance(obj, np.attr("generic"))) {
         h5_write_dataset(
-          group, path, py::module_::import("numpy").attr("asarray")(obj).cast<py::array>());
+          group, path, NumpyArray::from_object(py::module_::import_("numpy").attr("asarray")(obj)));
         return;
     }
     throw Hdf5ExportError("don't know how to write dataset for object");
@@ -299,17 +291,17 @@ h5_set_item(py::handle parent, std::string const& path, py::handle obj)
 void
 h5_set_attr(py::handle h5obj, std::string const& name, py::handle value)
 {
-    h5obj.attr("attrs")[py::str(name)] = value;
+    h5obj.attr("attrs")[to_str(name)] = value;
 }
 
 py::object
 h5_get_attr(py::handle h5obj, std::string const& name)
 {
-    py::object res = h5obj.attr("attrs").attr("get")(py::str(name));
+    py::object res = h5obj.attr("attrs").attr("get")(to_str(name));
     if (res.is_none())
         return py::none();
     if (py::isinstance<py::bytes>(res))
-        return py::str(res.cast<std::string>());
+        return to_str(py::cast<std::string>(res));
     return res;
 }
 
@@ -324,20 +316,20 @@ void
 h5_set_attr(hid_t loc, std::string const& name, py::handle value)
 {
     if (py::isinstance<py::str>(value)) {
-        h5_set_attr(loc, name, value.cast<std::string>());
+        h5_set_attr(loc, name, py::cast<std::string>(value));
         return;
     }
     if (value.ptr() == Py_True || value.ptr() == Py_False) {
         h5_set_attr(loc, name, PyObject_IsTrue(value.ptr()) != 0);
         return;
     }
-    py::module_ np = py::module_::import("numpy");
+    py::module_ np = py::module_::import_("numpy");
     if (py::isinstance<py::int_>(value) && !py::isinstance(value, np.attr("integer"))) {
-        h5_set_attr(loc, name, value.cast<std::int64_t>());
+        h5_set_attr(loc, name, py::cast<std::int64_t>(value));
         return;
     }
     py::object pyobj = h5py_from_hid(loc);
-    pyobj.attr("attrs")[py::str(name)] = value;
+    pyobj.attr("attrs")[to_str(name)] = value;
 }
 
 namespace {
@@ -370,7 +362,7 @@ h5_get_attr(hid_t loc, std::string const& name)
     // reading them with H5Aread into a single value returns only the first element.
     if (attr_dataspace_is_scalar(loc, name)) {
         if (auto s = h5_get_attr_string(loc, name))
-            return py::str(*s);
+            return to_str(*s);
         if (auto v = h5_get_attr_int64(loc, name))
             return py::int_(*v);
         hid_t attr = H5Aopen(loc, name.c_str(), H5P_DEFAULT);
@@ -392,7 +384,7 @@ h5_get_attr(hid_t loc, std::string const& name)
     }
 
     py::object pyobj = h5py_from_hid(loc);
-    return pyobj.attr("attrs").attr("get")(py::str(name));
+    return pyobj.attr("attrs").attr("get")(to_str(name));
 }
 
 namespace {
@@ -420,77 +412,77 @@ is_hdf5_bool_enum(hid_t ntype)
     return ok;
 }
 
-py::dtype
+NumpyDtype
 dtype_from_hdf5(hid_t ntype)
 {
     H5T_class_t cls = H5Tget_class(ntype);
     size_t sz = H5Tget_size(ntype);
     if (cls == H5T_ENUM) {
         if (is_hdf5_bool_enum(ntype))
-            return py::dtype("bool");
+            return NumpyDtype::from_spec("bool");
         hid_t super = H5Tget_super(ntype);
-        py::dtype dt = dtype_from_hdf5(super);
+        NumpyDtype dt = dtype_from_hdf5(super);
         H5Tclose(super);
         return dt;
     }
     if (cls == H5T_BITFIELD) {
         if (sz == 1)
-            return py::dtype::of<std::uint8_t>();
+            return NumpyDtype::from_spec("uint8");
         if (sz == 2)
-            return py::dtype::of<std::uint16_t>();
+            return NumpyDtype::from_spec("uint16");
         if (sz == 4)
-            return py::dtype::of<std::uint32_t>();
+            return NumpyDtype::from_spec("uint32");
         if (sz == 8)
-            return py::dtype::of<std::uint64_t>();
+            return NumpyDtype::from_spec("uint64");
     }
     if (cls == H5T_INTEGER) {
         H5T_sign_t sign = H5Tget_sign(ntype);
         if (sign == H5T_SGN_NONE) {
             if (sz == 1)
-                return py::dtype::of<std::uint8_t>();
+                return NumpyDtype::from_spec("uint8");
             if (sz == 2)
-                return py::dtype::of<std::uint16_t>();
+                return NumpyDtype::from_spec("uint16");
             if (sz == 4)
-                return py::dtype::of<std::uint32_t>();
+                return NumpyDtype::from_spec("uint32");
             if (sz == 8)
-                return py::dtype::of<std::uint64_t>();
+                return NumpyDtype::from_spec("uint64");
         } else {
             if (sz == 1)
-                return py::dtype::of<std::int8_t>();
+                return NumpyDtype::from_spec("int8");
             if (sz == 2)
-                return py::dtype::of<std::int16_t>();
+                return NumpyDtype::from_spec("int16");
             if (sz == 4)
-                return py::dtype::of<std::int32_t>();
+                return NumpyDtype::from_spec("int32");
             if (sz == 8)
-                return py::dtype::of<std::int64_t>();
+                return NumpyDtype::from_spec("int64");
         }
     } else if (cls == H5T_FLOAT) {
         if (sz == 2)
-            return py::dtype("float16");
+            return NumpyDtype::from_spec("float16");
         if (sz == 4)
-            return py::dtype::of<float>();
+            return NumpyDtype::from_spec("float32");
         if (sz == 8)
-            return py::dtype::of<double>();
+            return NumpyDtype::from_spec("float64");
     } else if (cls == H5T_COMPOUND) {
         if (sz == sizeof(std::complex<float>))
-            return py::dtype::of<std::complex<float>>();
+            return NumpyDtype::from_spec("complex64");
         if (sz == sizeof(std::complex<double>))
-            return py::dtype::of<std::complex<double>>();
+            return NumpyDtype::from_spec("complex128");
     }
     throw Hdf5ExportError("unsupported HDF5 dataset dtype");
 }
 
-py::array
+NumpyArray
 h5_read_array_h5py(hid_t dset)
 {
     py::object ds = h5py_from_hid(dset);
     py::object val = ds.attr("__getitem__")(py::ellipsis());
-    return py::module_::import("numpy").attr("asarray")(val).cast<py::array>();
+    return NumpyArray::from_object(py::module_::import_("numpy").attr("asarray")(val));
 }
 
 } // namespace
 
-py::array
+NumpyArray
 h5_read_array(hid_t dset)
 {
     hid_t ftype = H5Dget_type(dset);
@@ -503,19 +495,19 @@ h5_read_array(hid_t dset)
     };
     try {
         H5S_class_t space_type = H5Sget_simple_extent_type(space);
-        py::array arr;
+        NumpyArray arr;
         if (space_type == H5S_SCALAR) {
-            py::dtype dt = dtype_from_hdf5(ntype);
-            arr = py::array(dt, std::vector<py::ssize_t>{});
+            NumpyDtype dt = dtype_from_hdf5(ntype);
+            arr = NumpyArray::empty(dt, std::vector<Py_ssize_t>{});
             check_hdf5(H5Dread(dset, ntype, H5S_ALL, H5S_ALL, H5P_DEFAULT, arr.mutable_data()),
                        "H5Dread scalar");
         } else {
             int ndims = H5Sget_simple_extent_ndims(space);
             std::vector<hsize_t> dims(static_cast<size_t>(ndims));
             H5Sget_simple_extent_dims(space, dims.data(), nullptr);
-            std::vector<py::ssize_t> shape(dims.begin(), dims.end());
-            py::dtype dt = dtype_from_hdf5(ntype);
-            arr = py::array(dt, shape);
+            std::vector<Py_ssize_t> shape(dims.begin(), dims.end());
+            NumpyDtype dt = dtype_from_hdf5(ntype);
+            arr = NumpyArray::empty(dt, shape);
             if (arr.size() > 0)
                 check_hdf5(H5Dread(dset, ntype, H5S_ALL, H5S_ALL, H5P_DEFAULT, arr.mutable_data()),
                            "H5Dread array");

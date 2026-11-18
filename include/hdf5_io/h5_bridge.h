@@ -1,17 +1,14 @@
 #pragma once
 
 #include <hdf5_io/h5_ops.h>
+#include <hdf5_io/python.h>
 
 #include <complex>
 #include <cstdint>
-#include <pybind11/numpy.h>
-#include <pybind11/pybind11.h>
 #include <string>
 #include <vector>
 
 namespace hdf5_io {
-
-namespace py = pybind11;
 
 /// Integer HDF5 identifier stored by h5py (``obj.id.id``).
 hid_t hid_from_h5py(py::handle obj);
@@ -42,7 +39,7 @@ void h5_hard_link(py::handle parent, std::string const& path, py::handle src);
 
 /// Write ``parent[path] = obj`` as a dataset (numpy/scalars/str/bytes).
 void h5_write_dataset(py::handle parent, std::string const& path, py::handle obj);
-void h5_write_dataset(HighFive::Group& parent, std::string const& path, py::array const& obj);
+void h5_write_dataset(HighFive::Group& parent, std::string const& path, NumpyArray const& obj);
 void h5_write_dataset(HighFive::Group& parent, std::string const& path, py::bytes const& obj);
 
 /// Create a hard link or dataset, matching h5py ``parent[path] = obj``.
@@ -60,6 +57,6 @@ py::object h5_get_attr(hid_t loc, std::string const& name);
 bool h5_contains(py::handle parent, std::string const& name);
 
 /// Read a dataset as a numpy array (0-d for scalar dataspace).
-py::array h5_read_array(hid_t dset);
+NumpyArray h5_read_array(hid_t dset);
 
 } // namespace hdf5_io

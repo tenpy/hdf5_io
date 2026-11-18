@@ -1,8 +1,7 @@
 #pragma once
 
 #include <hdf5_io/hdf5_io.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
+#include <hdf5_io/python.h>
 
 namespace hdf5_io {
 
