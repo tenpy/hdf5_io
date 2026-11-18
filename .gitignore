@@ -4,9 +4,16 @@
 *.dat
 *.hdf5
 *.h5
+# Committed import fixtures (regenerate with ``python test_hdf5.py`` in src/python3).
+!src/python3/data/
+!src/python3/data/*.hdf5
+!tests/data/
+!tests/data/*.hdf5
 .DS_Store
 ._*
 data
+!src/python3/data/
+!tests/data/
 .eggs
 *.egg-info
 __pycache__
