@@ -38,7 +38,8 @@ jobs:
         working-directory: src/python3
         run: |
           # Local ``import hdf5_io`` as TeNPy sync expects; do not install tenpy-hdf5.
-          PYTHONPATH=. pytest test_hdf5.py -vv
+          # --rootdir=. / empty testpaths: ignore parent pyproject.toml collection config.
+          PYTHONPATH=. pytest test_hdf5.py -vv --rootdir=. -o testpaths=
 
   # Installable C++ / nanobind package + cross-compat with the reference module.
   cpp-package:

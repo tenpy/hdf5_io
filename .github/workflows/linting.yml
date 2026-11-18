@@ -30,7 +30,9 @@ jobs:
       - name: Lint python code
         run: |
           # TeNPy-synced trees (src/python2, src/python3) are excluded in pyproject.toml.
-          ruff check tenpy_hdf5 tests scripts
+          # scripts/: packaging helpers; docstring rules are noisy — skip D here.
+          ruff check tenpy_hdf5 tests
+          ruff check scripts --ignore D
 
       - name: Lint docs
         run: |

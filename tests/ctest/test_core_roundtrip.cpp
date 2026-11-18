@@ -55,7 +55,11 @@ main()
         int dummy = 0;
         saver.memorize_save(&dummy, g1.getId());
         hid_t existing = -1;
-        assert(saver.already_saved(&dummy, existing));
+        // Do not put already_saved inside assert(): NDEBUG strips the call (Release builds).
+        if (!saver.already_saved(&dummy, existing)) {
+            std::cerr << "expected memoized hid for hard-link test\n";
+            return 1;
+        }
         tenpy_hdf5::h5_hard_link(saver.root(), "obj_alias", existing);
     }
 

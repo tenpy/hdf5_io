@@ -479,15 +479,16 @@ class Hdf5Saver:
             "Hdf5Saver: object of type {t!r} without explicit HDF5 format; "
             "fall back to pickle protocol".format(t=type(obj)), UserWarning)
 
-        obj_reduce = getattr(obj, "__reduce__", None)
-        if obj_reduce is not None:
+        # Call via the instance (``obj.__reduce__()``), not an unbound ``getattr``
+        # result: NumPy 2 ``dtype.__reduce__`` is not a bound method and needs ``self``.
+        if getattr(obj, "__reduce__", None) is not None:
 
-            rv = obj_reduce()
+            rv = obj.__reduce__()
             if isinstance(rv, str):
                 h5gr = self.save_global(obj, REPR_GLOBAL)
                 return h5gr
             if not isinstance(rv, tuple) or not 2 <= len(rv) < 7:
-                raise Hdf5ExportError("Wrong return value of {0!r}".format(obj_reduce))
+                raise Hdf5ExportError("Wrong return value of {0!r}".format(obj.__reduce__))
 
             h5gr = self.save_reduce(*rv, obj=obj, path=path)
             return h5gr
@@ -735,9 +736,20 @@ class Hdf5Saver:
     if parse_version(np.__version__) < parse_version('1.20.0'):
         dispatch_save[np.dtype] = (save_dtype, REPR_DTYPE)
     else:
-        # numpy version 1.20 introduced separate subclasses of dtype for the standard types
-        for t in np.dtype.__subclasses__():
-            dispatch_save[t] = (save_dtype, REPR_DTYPE)
+        # NumPy 1.20+ uses concrete dtype subclasses; NumPy 2 nests them under abstract
+        # bases, so a shallow ``__subclasses__()`` miss e.g. ``Int64DType``.
+        # (Avoid a nested recursive def here: class-body scope does not bind the name.)
+        _dtype_stack = list(np.dtype.__subclasses__())
+        _dtype_seen = set()
+        dispatch_save[np.dtype] = (save_dtype, REPR_DTYPE)
+        while _dtype_stack:
+            _t_dtype = _dtype_stack.pop()
+            if _t_dtype in _dtype_seen:
+                continue
+            _dtype_seen.add(_t_dtype)
+            dispatch_save[_t_dtype] = (save_dtype, REPR_DTYPE)
+            _dtype_stack.extend(_t_dtype.__subclasses__())
+        del _dtype_stack, _dtype_seen, _t_dtype
 
     def save_ignored(self, obj, path, type_repr):
         """Don't save the Hdf5Ignored object; just return None."""
