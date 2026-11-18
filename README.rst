@@ -55,12 +55,19 @@ Three entry points (all exercised in CI):
 
        cd src/python3 && PYTHONPATH=. pytest test_hdf5.py -vv
 
+   Committed import fixtures: ``src/python3/data/*.hdf5``. Regenerate with::
+
+       cd src/python3 && PYTHONPATH=. python test_hdf5.py
+
 2. **Installable ``tenpy_hdf5`` package** (nanobind + cross-compat with the reference)::
 
        # Prefer conda-forge hdf5+h5py from environment.yml (same libhdf5).
        pip install --no-build-isolation -e ".[test]"
        pytest tests/ -vv
        ctest --test-dir build --output-on-failure
+
+   Committed import fixtures: ``tests/data/*.hdf5`` (written with ``tenpy_hdf5``
+   so ``ATTR_MODULE`` resolves to the installable package).
 
 3. **Python-free core** (C++ consumers such as lasyten)::
 

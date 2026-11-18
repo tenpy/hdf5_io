@@ -2,6 +2,7 @@
 
 import importlib.util
 import types
+import warnings
 from pathlib import Path
 
 import h5py
@@ -12,6 +13,10 @@ import tenpy_hdf5 as hdf5_io
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PYTHON3_REF = REPO_ROOT / 'src' / 'python3' / 'hdf5_io.py'
+# Package fixtures (written with ``tenpy_hdf5`` so ATTR_MODULE resolves).
+# Reference fixtures live under ``src/python3/data/`` (module name ``hdf5_io``).
+DATADIR = Path(__file__).resolve().parent / 'data'
+DATADIR_HDF5 = sorted(p.name for p in DATADIR.glob('*.hdf5')) if DATADIR.is_dir() else []
 
 
 def load_reference_python_module():
@@ -79,12 +84,17 @@ def assert_equal_data(data_imported, data_expected, max_recursion_depth=10):
                 assert_equal_data(vi, ve, max_recursion_depth - 1)
     elif isinstance(data_expected, np.ndarray):
         np.testing.assert_array_equal(data_imported, data_expected)
-    elif isinstance(data_expected, (int, float, np.int64, np.float64, bool)):
+    elif isinstance(data_expected, np.dtype):
+        assert data_imported == data_expected
+    elif isinstance(data_expected, (int, float, complex, np.int64, np.float64, bool, str, bytes)):
         assert data_imported == data_expected
     elif isinstance(data_expected, range):
         assert tuple(data_imported) == tuple(data_expected)
-    elif isinstance(data_expected, types.FunctionType):
+    elif isinstance(data_expected, (types.FunctionType, type)):
         assert data_imported is data_expected
+    elif isinstance(data_expected, hdf5_io.Hdf5Exportable):
+        assert type(data_imported) is type(data_expected)
+        assert getattr(data_imported, 'some_attr', None) == getattr(data_expected, 'some_attr', None)
 
 
 @pytest.mark.filterwarnings(r'ignore:Hdf5Saver.* object of type.*:UserWarning')
@@ -149,6 +159,18 @@ def test_cross_cpp_save_python_load(tmp_path):
     with h5py.File(filename, 'r') as f:
         loaded = ref.load_from_hdf5(f)
     assert_equal_data(loaded, data)
+
+
+@pytest.mark.parametrize('fn', DATADIR_HDF5)
+@pytest.mark.filterwarnings(r'ignore:Hdf5Saver.* object of type.*:UserWarning')
+def test_import_from_datadir(fn):
+    """Load committed fixtures under ``tests/data/`` (same payload as reference export)."""
+    path = DATADIR / fn
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=FutureWarning)
+        with h5py.File(path, 'r') as f:
+            loaded = hdf5_io.load_from_hdf5(f)
+    assert_equal_data(loaded, gen_example_data())
 
 
 def test_valid_hdf5_path_component():

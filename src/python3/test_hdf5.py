@@ -81,20 +81,33 @@ def assert_equal_data(data_imported, data_expected, max_recursion_depth=10):
                 assert_equal_data(vi, ve, max_recursion_depth - 1)
     elif isinstance(data_expected, np.ndarray):
         np.testing.assert_array_equal(data_imported, data_expected)
-    elif isinstance(data_expected, (int, float, np.int64, np.float64, bool)):
+    elif isinstance(data_expected, np.dtype):
+        assert data_imported == data_expected
+    elif isinstance(data_expected, (int, float, complex, np.int64, np.float64, bool, str, bytes)):
         assert data_imported == data_expected
     elif isinstance(data_expected, range):
         assert tuple(data_imported) == tuple(data_expected)
-    elif isinstance(data_expected, types.FunctionType):
-        # we test dump functions as global instances which are unique!
+    elif isinstance(data_expected, (types.FunctionType, type)):
+        # we test dump functions/classes as global instances which are unique!
         assert data_imported is data_expected
+    elif isinstance(data_expected, hdf5_io.Hdf5Exportable):
+        assert type(data_imported) is type(data_expected)
+        assert getattr(data_imported, 'some_attr', None) == getattr(data_expected, 'some_attr', None)
 
 
 def export_to_datadir():
-    filename = "data/exported_python3.hdf5"
+    """Write ``data/exported_python3.hdf5`` for :func:`test_import_from_datadir`.
+
+    Run this module as a script to regenerate the fixture after changing
+    :func:`gen_example_data`.
+    """
+    if not os.path.isdir(datadir):
+        os.mkdir(datadir)
+    filename = os.path.join(datadir, 'exported_python3.hdf5')
     data = gen_example_data()
     with h5py.File(filename, 'w') as f:
         hdf5_io.save_to_hdf5(f, data)
+    print('export to datadir:', filename)
 
 
 @pytest.mark.filterwarnings(r'ignore:Hdf5Saver.* object of type.*:UserWarning')
