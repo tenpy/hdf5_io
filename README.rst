@@ -7,13 +7,13 @@ The introduction/specification of the format is at https://tenpy.readthedocs.io/
 
 Since the general technique is not bound to the particular classes of TeNPy, I've separated the code into this repository.
 
-The file ``src/python3/hdf5_io.py`` should just be the corresponding file of the ``tenpy.tools.hdf5_io`` module in `TeNPy`_.
+The file ``src/python3/hdf5_io.py`` should just be the corresponding file of the ``tenpy.tools.hdf5_io`` module in `TeNPy`_ (version 1.X).
 It remains the reference Python implementation.
 
 C++ implementation
 ------------------
 
-The installable PyPI package ``tenpy-hdf5`` (import ``tenpy_hdf5``) provides the same public API via
+The installable PyPI package ``tenpy-hdf5`` (``import tenpy_hdf5`` in python) provides the same public API via
 nanobind bindings (``tenpy_hdf5._core``). HDF5 groups, datasets, attributes, and hard links are
 written through **libhdf5 + HighFive**, while callers still pass **h5py** ``File``/``Group``
 objects. On-disk format and Python API are backwards compatible with the reference module.
