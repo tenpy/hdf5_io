@@ -1,9 +1,1 @@
-target_sources(hdf5_io
-  PRIVATE
-  h5_bridge.cpp
-  helpers.cpp
-  exportable.cpp
-  saver.cpp
-  loader.cpp
-  wrappers.cpp
-)
+# Empty — sources listed in root CMakeLists for core / py split.

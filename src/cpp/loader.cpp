@@ -1,17 +1,14 @@
-#include <hdf5_io/h5_bridge.h>
-#include <hdf5_io/hdf5_io.h>
+#include <tenpy_hdf5/h5_bridge.h>
+#include <tenpy_hdf5/tenpy_hdf5.h>
 
-#include <pybind11/numpy.h>
-#include <pybind11/stl.h>
-
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 namespace {
 
 py::object
 self_obj(Hdf5Loader* self)
 {
-    return py::cast(self, py::return_value_policy::reference);
+    return py::cast(self, py::rv_policy::reference);
 }
 
 std::string
@@ -23,8 +20,8 @@ ensure_subpath(std::string const& path)
 py::object
 convert_scalar(py::object raw, std::string const& type_repr)
 {
-    py::module_ np = py::module_::import("numpy");
-    py::module_ builtins = py::module_::import("builtins");
+    py::module_ np = py::module_::import_("numpy");
+    py::module_ builtins = py::module_::import_("builtins");
     if (type_repr == REPR_INT)
         return builtins.attr("int")(raw);
     if (type_repr == REPR_FLOAT)
@@ -60,9 +57,9 @@ Hdf5Loader::Hdf5Loader(py::object h5group_, bool ignore_unknown_, py::object exc
     if (exclude.is_none())
         return;
     for (auto path : exclude) {
-        std::string p = path.cast<std::string>();
+        std::string p = py::cast<std::string>(path);
         if (!h5_contains(native_group, p)) {
-            py::module_::import("warnings")
+            py::module_::import_("warnings")
               .attr("warn")(py::str("can't exclude {0!r} from loading: not existent in h5group")
                               .attr("format")(path));
             continue;
@@ -78,14 +75,14 @@ Hdf5Loader::memo_load() const
 {
     py::dict out;
     for (auto const& [token, obj] : memo_load_objects)
-        out[py::str(token)] = obj;
+        out[to_str(token)] = obj;
     return out;
 }
 
 py::dict
 Hdf5Loader::dispatch_load() const
 {
-    return py::type::of<Hdf5Loader>().attr("dispatch_load");
+    return py::borrow<py::dict>(py::type<Hdf5Loader>().attr("dispatch_load"));
 }
 
 py::object
@@ -98,7 +95,7 @@ Hdf5Loader::load(py::object path)
         H5Iinc_ref(obj);
         path_str = h5_object_name(obj);
     } else {
-        path_str = path.cast<std::string>();
+        path_str = py::cast<std::string>(path);
         obj = h5_open(native_group, path_str);
     }
     std::string subpath = ensure_subpath(path_str);
@@ -116,7 +113,7 @@ Hdf5Loader::load_from(hid_t h5obj, std::string subpath)
         return in_memo->second;
 
     py::object type_repr_obj = get_attr(h5obj, ATTR_TYPE);
-    std::string type_repr = py::str(type_repr_obj).cast<std::string>();
+    std::string type_repr = py::cast<std::string>(py::str(type_repr_obj));
 
     auto const& cpp_disp = cpp_load_dispatch();
     auto it = cpp_disp.find(type_repr);
@@ -162,10 +159,10 @@ Hdf5Loader::get_all_hdf5_keys(py::object h5_group)
     for (auto const& name : names) {
         hid_t child = h5_open(loc, name);
         if (H5Iget_type(child) == H5I_GROUP) {
-            results[py::str(name)] = get_all_hdf5_keys(h5py_from_hid(child));
+            results[to_str(name)] = get_all_hdf5_keys(h5py_from_hid(child));
             any_group = true;
         } else {
-            results[py::str(name)] = h5py_from_hid(child);
+            results[to_str(name)] = h5py_from_hid(child);
         }
         H5Idec_ref(child);
         (void)close;
@@ -210,14 +207,14 @@ Hdf5Loader::load_dataset(hid_t h5obj, std::string const& type_info, std::string 
         repr != REPR_BOOL && repr != REPR_BYTES && repr != REPR_INT64 && repr != REPR_INT32 &&
         repr != REPR_FLOAT64 && repr != REPR_FLOAT32 && repr != REPR_COMPLEX128 &&
         repr != REPR_COMPLEX64)
-        repr = py::str(get_attr(h5obj, ATTR_TYPE)).cast<std::string>();
+        repr = py::cast<std::string>(py::str(get_attr(h5obj, ATTR_TYPE)));
     py::object obj;
     if (repr == REPR_BYTES)
-        obj = py::bytes(h5_read_vlen_string(h5obj));
+        obj = to_bytes(h5_read_vlen_string(h5obj));
     else if (repr == REPR_ARRAY)
         obj = h5_read_array(h5obj);
     else {
-        py::array arr = h5_read_array(h5obj);
+        NumpyArray arr = h5_read_array(h5obj);
         obj = convert_scalar(arr.attr("item")(), repr);
     }
     memorize_load(h5obj, obj);
@@ -229,7 +226,7 @@ Hdf5Loader::load_str(hid_t h5obj, std::string const& type_info, std::string cons
 {
     (void)type_info;
     (void)subpath;
-    py::object obj = py::str(h5_read_vlen_string(h5obj));
+    py::object obj = to_str(h5_read_vlen_string(h5obj));
     memorize_load(h5obj, obj);
     return obj;
 }
@@ -240,22 +237,24 @@ Hdf5Loader::load_converted_to_str(hid_t h5obj,
                                   std::string const& subpath)
 {
     (void)subpath;
-    py::object obj = py::str(h5_read_vlen_string(h5obj));
+    py::object obj = to_str(h5_read_vlen_string(h5obj));
     obj = convert_scalar(obj, type_info == REPR_INT_AS_STR ? std::string(REPR_INT) : type_info);
     memorize_load(h5obj, obj);
     return obj;
 }
 
 py::object
-Hdf5Loader::load_masked_array(hid_t h5obj, std::string const& type_info, std::string const& subpath)
+Hdf5Loader::load_masked_array(hid_t h5obj,
+                              std::string const& type_info,
+                              std::string const& subpath)
 {
     (void)type_info;
     (void)subpath;
-    py::object np = py::module_::import("numpy");
+    py::object np = py::module_::import_("numpy");
     py::object fill_value = get_attr(h5obj, "fill_value");
     py::object saved_mask = get_attr(h5obj, "saved_mask");
     py::object obj;
-    if (saved_mask.cast<bool>()) {
+    if (truthy(saved_mask)) {
         hid_t data_id = h5_open(h5obj, "data");
         hid_t mask_id = h5_open(h5obj, "mask");
         py::object data = h5_read_array(data_id);
@@ -282,9 +281,9 @@ Hdf5Loader::load_list(hid_t h5obj, std::string const& type_info, std::string con
     (void)type_info;
     py::list obj;
     memorize_load(h5obj, obj);
-    py::ssize_t length = get_attr(h5obj, ATTR_LEN).cast<py::ssize_t>();
-    for (py::ssize_t i = 0; i < length; ++i)
-        obj.append(load(py::str(subpath + std::to_string(i))));
+    Py_ssize_t length = py::cast<Py_ssize_t>(get_attr(h5obj, ATTR_LEN));
+    for (Py_ssize_t i = 0; i < length; ++i)
+        obj.append(load(to_str(subpath + std::to_string(i))));
     return obj;
 }
 
@@ -292,11 +291,11 @@ py::object
 Hdf5Loader::load_set(hid_t h5obj, std::string const& type_info, std::string const& subpath)
 {
     (void)type_info;
-    py::object obj = py::set();
+    py::set obj;
     memorize_load(h5obj, obj);
-    py::ssize_t length = get_attr(h5obj, ATTR_LEN).cast<py::ssize_t>();
-    for (py::ssize_t i = 0; i < length; ++i)
-        obj.attr("add")(load(py::str(subpath + std::to_string(i))));
+    Py_ssize_t length = py::cast<Py_ssize_t>(get_attr(h5obj, ATTR_LEN));
+    for (Py_ssize_t i = 0; i < length; ++i)
+        obj.attr("add")(load(to_str(subpath + std::to_string(i))));
     return obj;
 }
 
@@ -306,9 +305,9 @@ Hdf5Loader::load_tuple(hid_t h5obj, std::string const& type_info, std::string co
     (void)type_info;
     py::list obj;
     memorize_load(h5obj, obj);
-    py::ssize_t length = get_attr(h5obj, ATTR_LEN).cast<py::ssize_t>();
-    for (py::ssize_t i = 0; i < length; ++i)
-        obj.append(load(py::str(subpath + std::to_string(i))));
+    Py_ssize_t length = py::cast<Py_ssize_t>(get_attr(h5obj, ATTR_LEN));
+    for (Py_ssize_t i = 0; i < length; ++i)
+        obj.append(load(to_str(subpath + std::to_string(i))));
     py::tuple tup(obj);
     memo_load_objects[object_token(h5obj)] = tup;
     return tup;
@@ -325,7 +324,9 @@ Hdf5Loader::load_dict(hid_t h5obj, std::string const& type_info, std::string con
 }
 
 py::object
-Hdf5Loader::load_general_dict(hid_t h5obj, std::string const& type_info, std::string const& subpath)
+Hdf5Loader::load_general_dict(hid_t h5obj,
+                              std::string const& type_info,
+                              std::string const& subpath)
 {
     (void)type_info;
     py::dict obj;
@@ -336,7 +337,7 @@ Hdf5Loader::load_general_dict(hid_t h5obj, std::string const& type_info, std::st
     py::object values = load_list(values_id, REPR_LIST, subpath + "values/");
     H5Idec_ref(keys_id);
     H5Idec_ref(values_id);
-    obj.attr("update")(py::module_::import("builtins").attr("zip")(keys, values));
+    obj.attr("update")(py::module_::import_("builtins").attr("zip")(keys, values));
     return obj;
 }
 
@@ -347,7 +348,7 @@ Hdf5Loader::load_simple_dict(hid_t h5obj, std::string const& type_info, std::str
     py::dict obj;
     memorize_load(h5obj, obj);
     for (auto const& key : h5_link_names(h5obj))
-        obj[py::str(key)] = load(py::str(subpath + key));
+        obj[to_str(key)] = load(to_str(subpath + key));
     return obj;
 }
 
@@ -355,10 +356,10 @@ py::object
 Hdf5Loader::load_range(hid_t h5obj, std::string const& type_info, std::string const& subpath)
 {
     (void)type_info;
-    py::object start = load(py::str(subpath + "start"));
-    py::object stop = load(py::str(subpath + "stop"));
-    py::object step = load(py::str(subpath + "step"));
-    py::object obj = py::module_::import("builtins").attr("range")(start, stop, step);
+    py::object start = load(to_str(subpath + "start"));
+    py::object stop = load(to_str(subpath + "stop"));
+    py::object step = load(to_str(subpath + "step"));
+    py::object obj = py::module_::import_("builtins").attr("range")(start, stop, step);
     memorize_load(h5obj, obj);
     return obj;
 }
@@ -367,11 +368,11 @@ py::object
 Hdf5Loader::load_dtype(hid_t h5obj, std::string const& type_info, std::string const& subpath)
 {
     (void)type_info;
-    py::object np = py::module_::import("numpy");
-    std::string name = py::str(get_attr(h5obj, "name")).cast<std::string>();
+    py::object np = py::module_::import_("numpy");
+    std::string name = py::cast<std::string>(py::str(get_attr(h5obj, "name")));
     py::object obj;
     if (name.rfind("void", 0) == 0) {
-        py::object descr = load(py::str(subpath + "descr"));
+        py::object descr = load(to_str(subpath + "descr"));
         obj = np.attr("dtype")(descr);
     } else {
         obj = np.attr("dtype")(name);
@@ -386,15 +387,15 @@ Hdf5Loader::load_hdf5exportable(hid_t h5obj,
                                 std::string const& subpath)
 {
     (void)type_info;
-    std::string module_name = py::str(get_attr(h5obj, ATTR_MODULE)).cast<std::string>();
-    std::string class_name = py::str(get_attr(h5obj, ATTR_CLASS)).cast<std::string>();
+    std::string module_name = py::cast<std::string>(py::str(get_attr(h5obj, ATTR_MODULE)));
+    std::string class_name = py::cast<std::string>(py::str(get_attr(h5obj, ATTR_CLASS)));
     py::object cls;
     try {
         cls = find_global(module_name, class_name);
-    } catch (py::error_already_set& e) {
+    } catch (py::python_error& e) {
         std::string msg = "Can't import class " + class_name + " from " + module_name;
         if (ignore_unknown) {
-            py::module_::import("warnings").attr("warn")(msg);
+            py::module_::import_("warnings").attr("warn")(msg);
             return py::cast(Hdf5Ignored(msg));
         }
         throw;
@@ -416,15 +417,15 @@ Hdf5Loader::load_global(hid_t h5obj, std::string const& type_info, std::string c
 {
     (void)type_info;
     (void)subpath;
-    std::string module_name = py::str(get_attr(h5obj, ATTR_MODULE)).cast<std::string>();
-    std::string class_name = py::str(get_attr(h5obj, ATTR_CLASS)).cast<std::string>();
+    std::string module_name = py::cast<std::string>(py::str(get_attr(h5obj, ATTR_MODULE)));
+    std::string class_name = py::cast<std::string>(py::str(get_attr(h5obj, ATTR_CLASS)));
     py::object obj;
     try {
         obj = find_global(module_name, class_name);
-    } catch (py::error_already_set& e) {
+    } catch (py::python_error& e) {
         std::string msg = "Can't import global " + class_name + " from " + module_name;
         if (ignore_unknown) {
-            py::module_::import("warnings").attr("warn")(msg);
+            py::module_::import_("warnings").attr("warn")(msg);
             return py::cast(Hdf5Ignored(msg));
         }
         throw;
@@ -437,14 +438,14 @@ py::object
 Hdf5Loader::load_reduce(hid_t h5obj, std::string const& type_info, std::string const& subpath)
 {
     (void)type_info;
-    py::object func = load(py::str(subpath + "func"));
-    py::object args = load(py::str(subpath + "args"));
-    py::object obj = func(*py::reinterpret_borrow<py::tuple>(args));
+    py::object func = load(to_str(subpath + "func"));
+    py::object args = load(to_str(subpath + "args"));
+    py::object obj = func(*py::borrow<py::tuple>(args));
     memorize_load(h5obj, obj);
     if (h5_contains(h5obj, "state")) {
-        py::object state = load(py::str(subpath + "state"));
+        py::object state = load(to_str(subpath + "state"));
         if (h5_contains(h5obj, "state_setter")) {
-            py::object state_setter = load(py::str(subpath + "state_setter"));
+            py::object state_setter = load(to_str(subpath + "state_setter"));
             obj = state_setter(obj, state);
             memorize_load(h5obj, obj);
         } else {
@@ -454,25 +455,25 @@ Hdf5Loader::load_reduce(hid_t h5obj, std::string const& type_info, std::string c
             } else {
                 py::object slotstate = py::none();
                 if (py::isinstance<py::tuple>(state) && py::len(state) == 2) {
-                    py::tuple st = py::reinterpret_borrow<py::tuple>(state);
+                    py::tuple st = py::borrow<py::tuple>(state);
                     state = st[0];
                     slotstate = st[1];
                 }
-                if (!state.is_none() && py::bool_(state).cast<bool>()) {
+                if (!state.is_none() && truthy(state)) {
                     py::object obj_dict = obj.attr("__dict__");
-                    py::object intern = py::module_::import("sys").attr("intern");
+                    py::object intern = py::module_::import_("sys").attr("intern");
                     for (auto item : state.attr("items")()) {
-                        py::tuple kv = py::reinterpret_borrow<py::tuple>(item);
+                        py::tuple kv = py::borrow<py::tuple>(item);
                         py::object k = kv[0];
-                        if (py::type::of(k).is(py::type::of(py::str())))
+                        if (PyUnicode_CheckExact(k.ptr()))
                             obj_dict[intern(k)] = kv[1];
                         else
                             obj_dict[k] = kv[1];
                     }
                 }
-                if (!slotstate.is_none() && py::bool_(slotstate).cast<bool>()) {
+                if (!slotstate.is_none() && truthy(slotstate)) {
                     for (auto item : slotstate.attr("items")()) {
-                        py::tuple kv = py::reinterpret_borrow<py::tuple>(item);
+                        py::tuple kv = py::borrow<py::tuple>(item);
                         py::setattr(obj, kv[0], kv[1]);
                     }
                 }
@@ -480,18 +481,18 @@ Hdf5Loader::load_reduce(hid_t h5obj, std::string const& type_info, std::string c
         }
     }
     if (h5_contains(h5obj, "listitems")) {
-        py::object listitems = load(py::str(subpath + "listitems"));
+        py::object listitems = load(to_str(subpath + "listitems"));
         for (auto item : listitems)
             obj.attr("append")(item);
     }
     if (h5_contains(h5obj, "dictitems")) {
-        py::object dictitems = load(py::str(subpath + "dictitems"));
+        py::object dictitems = load(to_str(subpath + "dictitems"));
         for (auto item : dictitems) {
-            py::tuple kv = py::reinterpret_borrow<py::tuple>(item);
+            py::tuple kv = py::borrow<py::tuple>(item);
             obj[kv[0]] = kv[1];
         }
     }
     return obj;
 }
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

@@ -1,0 +1,16 @@
+name: tenpy-hdf5
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.12
+  - cmake
+  - ninja
+  - cxx-compiler
+  - hdf5
+  - numpy>=2.0
+  - h5py
+  - pip
+  - pip:
+      - nanobind>=3.0
+      - scikit-build-core
+      - build

@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace hdf5_io {
+namespace tenpy_hdf5 {
 
 class Hdf5FormatError : public std::runtime_error
 {
@@ -23,4 +23,4 @@ class Hdf5ImportError : public Hdf5FormatError
     using Hdf5FormatError::Hdf5FormatError;
 };
 
-} // namespace hdf5_io
+} // namespace tenpy_hdf5

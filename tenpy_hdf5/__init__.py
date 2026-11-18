@@ -1,6 +1,6 @@
 """HDF5 import/export of general Python objects (TeNPy format).
 
-The public API is implemented in C++ (``hdf5_io._core``) and is a drop-in
+The public API is implemented in C++ (``tenpy_hdf5._core``) and is a drop-in
 replacement for the reference Python module in ``src/python3/hdf5_io.py``.
 """
 

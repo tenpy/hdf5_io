@@ -12,6 +12,7 @@ data
 __pycache__
 playground
 build
+build-core
 dist
 .venv
 .pytest_cache

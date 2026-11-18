@@ -1,0 +1,7 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(HDF5 REQUIRED COMPONENTS C)
+
+include("${CMAKE_CURRENT_LIST_DIR}/tenpy_hdf5Targets.cmake")
+check_required_components(tenpy_hdf5)

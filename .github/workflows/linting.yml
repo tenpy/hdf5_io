@@ -21,12 +21,18 @@ jobs:
 
       - name: Install lint dependencies
         run: |
+          # Lint tools only — do not build the C++ extension (needs libhdf5-dev).
           python -m pip install --upgrade pip
-          python -m pip install -e ".[lint]"
+          python -m pip install ruff flake8 flake8-rst-docstrings sphinx-lint
+          sudo apt-get update
+          sudo apt-get install -y clang-format
 
       - name: Lint python code
         run: |
-          ruff check
+          # TeNPy-synced trees (src/python2, src/python3) are excluded in pyproject.toml.
+          # scripts/: packaging helpers; docstring rules are noisy — skip D here.
+          ruff check tenpy_hdf5 tests
+          ruff check scripts --ignore D
 
       - name: Lint docs
         run: |
@@ -35,4 +41,17 @@ jobs:
 
       - name: Run autoformatter
         run: |
-          ruff format --diff
+          ruff format --diff tenpy_hdf5 tests scripts
+
+      - name: clang-format
+        run: |
+          mapfile -t files < <(
+            find include src/cpp pybind tests/ctest \
+              \( -name '*.h' -o -name '*.hpp' -o -name '*.cpp' -o -name '*.cxx' -o -name '*.cc' \) \
+              -print | sort
+          )
+          if ((${#files[@]} == 0)); then
+            echo "No C/C++ sources found for clang-format"
+            exit 1
+          fi
+          clang-format --dry-run --Werror "${files[@]}"

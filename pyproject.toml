@@ -1,12 +1,12 @@
 [project]
-name = "hdf5_io"
+name = "tenpy-hdf5"
 version = "0.1.0"
 description = "Import and export of general Python objects to HDF5 (TeNPy format)"
 readme = {file = "README.rst", content-type = "text/x-rst"}
 license-files = ["LICENSE"]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "Apache-2.0"
-keywords = ["hdf5", "h5py", "serialization"]
+keywords = ["hdf5", "h5py", "serialization", "tenpy"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -28,17 +28,19 @@ lint = ["ruff", "flake8", "flake8-rst-docstrings", "sphinx-lint"]
 "Source" = "https://github.com/tenpy/hdf5_io"
 
 [build-system]
-requires = ["scikit-build-core", "pybind11", "numpy>=2.0"]
+requires = ["scikit-build-core", "nanobind>=3.0", "numpy>=2.0"]
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]
 cmake.version = ">=3.15"
 build-dir = "build"
-cmake.build-type = "Debug"
-wheel.packages = ["hdf5_io"]
+cmake.build-type = "RelWithDebInfo"
+wheel.packages = ["tenpy_hdf5"]
+wheel.py-api = "cp312"
 
 [tool.scikit-build.cmake.define]
 BUILD_TESTING = {env = "BUILD_TESTING", default = "ON"}
+TENPY_HDF5_BUILD_PYTHON = {env = "TENPY_HDF5_BUILD_PYTHON", default = "ON"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -48,7 +50,7 @@ filterwarnings = [
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py312"
 exclude = ["scripts/", "src/python2/", "src/python3/"]
 
 [tool.ruff.lint]
@@ -97,3 +99,24 @@ ignore = [
 [tool.ruff.format]
 quote-style = "single"
 docstring-code-format = true
+
+# cibuildwheel: Stable ABI wheels (wheel.py-api = cp312). Build on 3.12+;
+# the resulting abi3 tag is usable on all supported CPythons.
+[tool.cibuildwheel]
+build = "cp312-*"
+skip = "pp* *-musllinux_* *i686* *win32*"
+build-verbosity = 1
+config-settings = "cmake.build-type=Release cmake.define.BUILD_TESTING=OFF"
+test-skip = "*"
+
+[tool.cibuildwheel.linux]
+before-all = [
+  "yum install -y hdf5-devel || dnf install -y hdf5-devel",
+]
+before-build = "pip install numpy nanobind scikit-build-core cmake ninja"
+
+[tool.cibuildwheel.macos]
+archs = ["native"]
+before-all = "brew install hdf5 || true"
+before-build = "pip install numpy nanobind scikit-build-core cmake ninja"
+environment = { MACOSX_DEPLOYMENT_TARGET = "12.0" }

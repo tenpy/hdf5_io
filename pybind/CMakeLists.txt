@@ -1,5 +1,5 @@
 target_sources(_core
-  PUBLIC
+  PRIVATE
   _core.cpp
-  py_hdf5_io.cpp
+  py_tenpy_hdf5.cpp
 )

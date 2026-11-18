@@ -1,4 +1,4 @@
-"""Tests for the C++ hdf5_io package."""
+"""Tests for the C++ tenpy_hdf5 package."""
 
 import importlib.util
 import types
@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 import pytest
 
-import hdf5_io
+import tenpy_hdf5 as hdf5_io
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PYTHON3_REF = REPO_ROOT / 'src' / 'python3' / 'hdf5_io.py'
