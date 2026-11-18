@@ -37,6 +37,7 @@ Core-only CMake (no Python)::
 
 Requirements: Python >= 3.12, numpy, h5py, HDF5 development libraries, CMake, nanobind >= 3.0.
 HighFive is fetched automatically via CMake if not installed system-wide.
+Wheels use the Python Stable ABI (``cp312``); see ``.github/workflows/publish.yml``.
 
 Tests::
 

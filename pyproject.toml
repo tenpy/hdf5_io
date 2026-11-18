@@ -99,3 +99,24 @@ ignore = [
 [tool.ruff.format]
 quote-style = "single"
 docstring-code-format = true
+
+# cibuildwheel: Stable ABI wheels (wheel.py-api = cp312). Build on 3.12+;
+# the resulting abi3 tag is usable on all supported CPythons.
+[tool.cibuildwheel]
+build = "cp312-*"
+skip = "pp* *-musllinux_* *i686* *win32*"
+build-verbosity = 1
+config-settings = "cmake.build-type=Release cmake.define.BUILD_TESTING=OFF"
+test-skip = "*"
+
+[tool.cibuildwheel.linux]
+before-all = [
+  "yum install -y hdf5-devel || dnf install -y hdf5-devel",
+]
+before-build = "pip install numpy nanobind scikit-build-core cmake ninja"
+
+[tool.cibuildwheel.macos]
+archs = ["native"]
+before-all = "brew install hdf5 || true"
+before-build = "pip install numpy nanobind scikit-build-core cmake ninja"
+environment = { MACOSX_DEPLOYMENT_TARGET = "12.0" }
