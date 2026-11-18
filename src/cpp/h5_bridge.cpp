@@ -278,7 +278,9 @@ h5_write_dataset(py::handle parent, std::string const& path, py::handle obj)
     }
     if (py::isinstance(obj, np.attr("generic"))) {
         h5_write_dataset(
-          group, path, NumpyArray::from_object(py::module_::import_("numpy").attr("asarray")(obj)));
+          group,
+          path,
+          NumpyArray::from_object(py::module_::import_("numpy").attr("asarray")(obj)));
         return;
     }
     throw Hdf5ExportError("don't know how to write dataset for object");

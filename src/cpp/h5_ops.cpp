@@ -89,9 +89,8 @@ void
 write_typed_buffer(HighFive::Group& group, std::string const& path, Hdf5Buffer const& buf)
 {
     HighFive::DataSpace space =
-      buf.shape.empty()
-        ? HighFive::DataSpace(HighFive::DataSpace::DataspaceType::dataspace_scalar)
-        : HighFive::DataSpace(buf.shape);
+      buf.shape.empty() ? HighFive::DataSpace(HighFive::DataSpace::DataspaceType::dataspace_scalar)
+                        : HighFive::DataSpace(buf.shape);
     auto dset = group.createDataSet(path, space, HighFive::create_datatype<T>());
     std::size_t n = 1;
     for (auto d : buf.shape)
@@ -334,8 +333,8 @@ h5_link_names(hid_t loc)
     std::vector<std::string> names;
     names.reserve(static_cast<size_t>(info.nlinks));
     for (hsize_t i = 0; i < info.nlinks; ++i) {
-        ssize_t sz = H5Lget_name_by_idx(
-          loc, ".", H5_INDEX_NAME, H5_ITER_INC, i, nullptr, 0, H5P_DEFAULT);
+        ssize_t sz =
+          H5Lget_name_by_idx(loc, ".", H5_INDEX_NAME, H5_ITER_INC, i, nullptr, 0, H5P_DEFAULT);
         if (sz < 0)
             throw Hdf5ExportError("H5Lget_name_by_idx failed");
         std::string name(static_cast<size_t>(sz), '\0');

@@ -41,7 +41,7 @@ main()
         tenpy_hdf5::Hdf5Buffer buf;
         buf.kind = 'f';
         buf.itemsize = 8;
-        buf.shape = {2};
+        buf.shape = { 2 };
         buf.storage = std::shared_ptr<std::uint8_t[]>(new std::uint8_t[16]);
         double* d = reinterpret_cast<double*>(buf.storage.get());
         d[0] = 1.5;
@@ -50,7 +50,8 @@ main()
 
         // Hard-link sharing: save exportable-like group twice via memo
         HighFive::Group g1 = tenpy_hdf5::h5_create_group(saver.root(), "obj");
-        tenpy_hdf5::h5_set_attr(g1.getId(), tenpy_hdf5::ATTR_TYPE, std::string(tenpy_hdf5::REPR_HDF5EXPORTABLE));
+        tenpy_hdf5::h5_set_attr(
+          g1.getId(), tenpy_hdf5::ATTR_TYPE, std::string(tenpy_hdf5::REPR_HDF5EXPORTABLE));
         int dummy = 0;
         saver.memorize_save(&dummy, g1.getId());
         hid_t existing = -1;

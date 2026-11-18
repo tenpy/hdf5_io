@@ -7,11 +7,11 @@
 /// accessed through its Python-level API and the buffer protocol (no NumPy C API).
 
 #include <nanobind/nanobind.h>
-#include <nanobind/trampoline.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/vector.h>
+#include <nanobind/trampoline.h>
 
 #include <cstddef>
 #include <string>
@@ -63,8 +63,7 @@ class NumpyDtype : public py::object
     /// ``numpy.dtype(spec)`` for a string spec such as ``"uint8"``.
     static NumpyDtype from_spec(char const* spec)
     {
-        return py::steal<NumpyDtype>(
-          py::module_::import_("numpy").attr("dtype")(spec).release());
+        return py::steal<NumpyDtype>(py::module_::import_("numpy").attr("dtype")(spec).release());
     }
 
     /// Single character code (``'f'``, ``'c'``, ``'i'``, ``'u'``, ``'b'``, ...).
@@ -107,8 +106,7 @@ class NumpyArray : public py::object
     /// ``numpy.asarray(obj)``
     static NumpyArray from_object(py::handle obj)
     {
-        return py::steal<NumpyArray>(
-          py::module_::import_("numpy").attr("asarray")(obj).release());
+        return py::steal<NumpyArray>(py::module_::import_("numpy").attr("asarray")(obj).release());
     }
 
     /// ``numpy.empty(shape, dtype)``
@@ -117,9 +115,8 @@ class NumpyArray : public py::object
         py::list dims;
         for (Py_ssize_t d : shape)
             dims.append(d);
-        return py::steal<NumpyArray>(py::module_::import_("numpy")
-                                       .attr("empty")(py::tuple(dims), dtype)
-                                       .release());
+        return py::steal<NumpyArray>(
+          py::module_::import_("numpy").attr("empty")(py::tuple(dims), dtype).release());
     }
 
     Py_ssize_t ndim() const { return py::cast<Py_ssize_t>(attr("ndim")); }
@@ -133,10 +130,7 @@ class NumpyArray : public py::object
 
     NumpyDtype dtype() const { return py::borrow<NumpyDtype>(attr("dtype")); }
 
-    bool is_c_contiguous() const
-    {
-        return py::cast<bool>(attr("flags").attr("c_contiguous"));
-    }
+    bool is_c_contiguous() const { return py::cast<bool>(attr("flags").attr("c_contiguous")); }
 
     /// Return self if C-contiguous, else a C-ordered copy (keeps 0-d arrays 0-d).
     NumpyArray as_c_contiguous() const

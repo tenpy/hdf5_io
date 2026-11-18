@@ -1,11 +1,11 @@
 #pragma once
 
+#include <cstdint>
+#include <highfive/highfive.hpp>
+#include <string>
 #include <tenpy_hdf5/constants.h>
 #include <tenpy_hdf5/exceptions.h>
 #include <tenpy_hdf5/python.h>
-#include <highfive/highfive.hpp>
-#include <cstdint>
-#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -76,7 +76,9 @@ class Hdf5Saver
     hid_t save_iterable(py::object obj, std::string const& path, std::string const& type_repr);
     void save_iterable_content(py::object obj, HighFive::Group& h5gr, std::string const& subpath);
     hid_t save_dict(py::object obj, std::string const& path, std::string const& type_repr);
-    std::string save_dict_content(py::object obj, HighFive::Group& h5gr, std::string const& subpath);
+    std::string save_dict_content(py::object obj,
+                                  HighFive::Group& h5gr,
+                                  std::string const& subpath);
     hid_t save_range(py::object obj, std::string const& path, std::string const& type_repr);
     hid_t save_dtype(py::object obj, std::string const& path, std::string const& type_repr);
     hid_t save_ignored(py::object obj, std::string const& path, std::string const& type_repr);
@@ -124,7 +126,9 @@ class Hdf5Loader
     py::object load_general_dict(hid_t h5obj,
                                  std::string const& type_info,
                                  std::string const& subpath);
-    py::object load_simple_dict(hid_t h5obj, std::string const& type_info, std::string const& subpath);
+    py::object load_simple_dict(hid_t h5obj,
+                                std::string const& type_info,
+                                std::string const& subpath);
     py::object load_range(hid_t h5obj, std::string const& type_info, std::string const& subpath);
     py::object load_dtype(hid_t h5obj, std::string const& type_info, std::string const& subpath);
     py::object load_hdf5exportable(hid_t h5obj,

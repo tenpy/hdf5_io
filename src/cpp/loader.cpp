@@ -244,7 +244,9 @@ Hdf5Loader::load_converted_to_str(hid_t h5obj,
 }
 
 py::object
-Hdf5Loader::load_masked_array(hid_t h5obj, std::string const& type_info, std::string const& subpath)
+Hdf5Loader::load_masked_array(hid_t h5obj,
+                              std::string const& type_info,
+                              std::string const& subpath)
 {
     (void)type_info;
     (void)subpath;
@@ -322,7 +324,9 @@ Hdf5Loader::load_dict(hid_t h5obj, std::string const& type_info, std::string con
 }
 
 py::object
-Hdf5Loader::load_general_dict(hid_t h5obj, std::string const& type_info, std::string const& subpath)
+Hdf5Loader::load_general_dict(hid_t h5obj,
+                              std::string const& type_info,
+                              std::string const& subpath)
 {
     (void)type_info;
     py::dict obj;

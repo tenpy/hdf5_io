@@ -1,7 +1,7 @@
 #pragma once
 
-#include <tenpy_hdf5/tenpy_hdf5.h>
 #include <tenpy_hdf5/python.h>
+#include <tenpy_hdf5/tenpy_hdf5.h>
 
 namespace tenpy_hdf5 {
 

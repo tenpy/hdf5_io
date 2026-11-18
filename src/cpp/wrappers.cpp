@@ -138,7 +138,10 @@ init_dispatch_tables(py::module_& m)
         cpp_load_dispatch()[repr] = cpp_fn;
     };
 
-    add_save(py::borrow(py::none().type()), saver_cls.attr("save_none"), REPR_NONE, &Hdf5Saver::save_none);
+    add_save(py::borrow(py::none().type()),
+             saver_cls.attr("save_none"),
+             REPR_NONE,
+             &Hdf5Saver::save_none);
 
     py::list types_for_datasets;
     auto add_dataset = [&](py::object ty, char const* repr) {
@@ -167,14 +170,22 @@ init_dispatch_tables(py::module_& m)
              saver_cls.attr("save_masked_array"),
              REPR_MASKED_ARRAY,
              &Hdf5Saver::save_masked_array);
-    add_save(builtins.attr("list"), saver_cls.attr("save_iterable"), REPR_LIST, &Hdf5Saver::save_iterable);
+    add_save(builtins.attr("list"),
+             saver_cls.attr("save_iterable"),
+             REPR_LIST,
+             &Hdf5Saver::save_iterable);
     add_save(builtins.attr("tuple"),
              saver_cls.attr("save_iterable"),
              REPR_TUPLE,
              &Hdf5Saver::save_iterable);
-    add_save(builtins.attr("set"), saver_cls.attr("save_iterable"), REPR_SET, &Hdf5Saver::save_iterable);
-    add_save(builtins.attr("dict"), saver_cls.attr("save_dict"), REPR_DICT_GENERAL, &Hdf5Saver::save_dict);
-    add_save(builtins.attr("range"), saver_cls.attr("save_range"), REPR_RANGE, &Hdf5Saver::save_range);
+    add_save(
+      builtins.attr("set"), saver_cls.attr("save_iterable"), REPR_SET, &Hdf5Saver::save_iterable);
+    add_save(builtins.attr("dict"),
+             saver_cls.attr("save_dict"),
+             REPR_DICT_GENERAL,
+             &Hdf5Saver::save_dict);
+    add_save(
+      builtins.attr("range"), saver_cls.attr("save_range"), REPR_RANGE, &Hdf5Saver::save_range);
 
     py::object dtype_type = np.attr("dtype");
     for (auto t : dtype_type.attr("__subclasses__")()) {
@@ -191,7 +202,10 @@ init_dispatch_tables(py::module_& m)
         }
     }
 
-    add_save(m.attr("Hdf5Ignored"), saver_cls.attr("save_ignored"), REPR_IGNORED, &Hdf5Saver::save_ignored);
+    add_save(m.attr("Hdf5Ignored"),
+             saver_cls.attr("save_ignored"),
+             REPR_IGNORED,
+             &Hdf5Saver::save_ignored);
     add_save(types.attr("FunctionType"),
              saver_cls.attr("save_global"),
              REPR_FUNCTION,
@@ -200,7 +214,8 @@ init_dispatch_tables(py::module_& m)
              saver_cls.attr("save_global"),
              REPR_FUNCTION,
              &Hdf5Saver::save_global);
-    add_save(builtins.attr("type"), saver_cls.attr("save_global"), REPR_CLASS, &Hdf5Saver::save_global);
+    add_save(
+      builtins.attr("type"), saver_cls.attr("save_global"), REPR_CLASS, &Hdf5Saver::save_global);
     // Bound classes use nanobind's metaclass instead of plain ``type``.
     py::object nb_meta_type = builtins.attr("type")(saver_cls);
     if (!nb_meta_type.is(builtins.attr("type")))
@@ -218,7 +233,8 @@ init_dispatch_tables(py::module_& m)
              &Hdf5Loader::load_masked_array);
     add_load(REPR_LIST, loader_cls.attr("load_list"), py::str(REPR_LIST), &Hdf5Loader::load_list);
     add_load(REPR_SET, loader_cls.attr("load_set"), py::str(REPR_SET), &Hdf5Loader::load_set);
-    add_load(REPR_TUPLE, loader_cls.attr("load_tuple"), py::str(REPR_TUPLE), &Hdf5Loader::load_tuple);
+    add_load(
+      REPR_TUPLE, loader_cls.attr("load_tuple"), py::str(REPR_TUPLE), &Hdf5Loader::load_tuple);
     add_load(REPR_DICT_GENERAL,
              loader_cls.attr("load_general_dict"),
              py::str(REPR_DICT_GENERAL),
@@ -227,17 +243,28 @@ init_dispatch_tables(py::module_& m)
              loader_cls.attr("load_simple_dict"),
              py::str(REPR_DICT_SIMPLE),
              &Hdf5Loader::load_simple_dict);
-    add_load(REPR_RANGE, loader_cls.attr("load_range"), py::str(REPR_RANGE), &Hdf5Loader::load_range);
-    add_load(REPR_DTYPE, loader_cls.attr("load_dtype"), py::str(REPR_DTYPE), &Hdf5Loader::load_dtype);
+    add_load(
+      REPR_RANGE, loader_cls.attr("load_range"), py::str(REPR_RANGE), &Hdf5Loader::load_range);
+    add_load(
+      REPR_DTYPE, loader_cls.attr("load_dtype"), py::str(REPR_DTYPE), &Hdf5Loader::load_dtype);
     add_load(REPR_HDF5EXPORTABLE,
              loader_cls.attr("load_hdf5exportable"),
              py::str(REPR_HDF5EXPORTABLE),
              &Hdf5Loader::load_hdf5exportable);
-    add_load(REPR_IGNORED, loader_cls.attr("load_ignored"), py::str(REPR_IGNORED), &Hdf5Loader::load_ignored);
-    add_load(REPR_FUNCTION, loader_cls.attr("load_global"), py::str(REPR_FUNCTION), &Hdf5Loader::load_global);
-    add_load(REPR_CLASS, loader_cls.attr("load_global"), py::str(REPR_CLASS), &Hdf5Loader::load_global);
-    add_load(REPR_GLOBAL, loader_cls.attr("load_global"), py::str(REPR_GLOBAL), &Hdf5Loader::load_global);
-    add_load(REPR_REDUCE, loader_cls.attr("load_reduce"), py::str(REPR_REDUCE), &Hdf5Loader::load_reduce);
+    add_load(REPR_IGNORED,
+             loader_cls.attr("load_ignored"),
+             py::str(REPR_IGNORED),
+             &Hdf5Loader::load_ignored);
+    add_load(REPR_FUNCTION,
+             loader_cls.attr("load_global"),
+             py::str(REPR_FUNCTION),
+             &Hdf5Loader::load_global);
+    add_load(
+      REPR_CLASS, loader_cls.attr("load_global"), py::str(REPR_CLASS), &Hdf5Loader::load_global);
+    add_load(
+      REPR_GLOBAL, loader_cls.attr("load_global"), py::str(REPR_GLOBAL), &Hdf5Loader::load_global);
+    add_load(
+      REPR_REDUCE, loader_cls.attr("load_reduce"), py::str(REPR_REDUCE), &Hdf5Loader::load_reduce);
 
     saver_cls.attr("dispatch_save") = dispatch_save;
     loader_cls.attr("dispatch_load") = dispatch_load;

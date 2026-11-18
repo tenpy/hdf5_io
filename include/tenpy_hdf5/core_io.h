@@ -26,7 +26,8 @@ class Loader;
 struct Value;
 
 using SaveFn = std::function<void(Saver&, HighFive::Group&, std::string const& subpath, void*)>;
-using LoadFn = std::function<std::shared_ptr<void>(Loader&, HighFive::Group&, std::string const& subpath)>;
+using LoadFn =
+  std::function<std::shared_ptr<void>(Loader&, HighFive::Group&, std::string const& subpath)>;
 
 void register_type(std::string module, std::string class_name, SaveFn save, LoadFn load);
 bool has_registered_type(std::string const& module, std::string const& class_name);
@@ -44,7 +45,7 @@ class Saver
     bool already_saved(void const* identity, hid_t& out_hid) const;
 
     std::pair<HighFive::Group, std::string> create_group_for_obj(std::string const& path,
-                                                                void const* identity);
+                                                                 void const* identity);
 
     hid_t save_none(std::string const& path);
     hid_t save_bool(std::string const& path, bool v);
@@ -53,7 +54,9 @@ class Saver
     hid_t save_complex(std::string const& path, std::complex<double> const& v);
     hid_t save_string(std::string const& path, std::string const& v);
     hid_t save_bytes(std::string const& path, std::string const& v);
-    hid_t save_array(std::string const& path, Hdf5Buffer const& buf, char const* type_repr = REPR_ARRAY);
+    hid_t save_array(std::string const& path,
+                     Hdf5Buffer const& buf,
+                     char const* type_repr = REPR_ARRAY);
 
     /// Create a list/tuple/set group; caller fills children ``0..n-1``.
     hid_t save_sequence_begin(std::string const& path,
@@ -67,7 +70,8 @@ class Saver
                                  HighFive::Group& out_group,
                                  std::string& out_subpath);
 
-    /// Save a registered exportable instance (writes type/module/class attrs, then calls registry).
+    /// Save a registered exportable instance (writes type/module/class attrs, then calls
+    /// registry).
     hid_t save_exportable(std::string const& path,
                           std::string const& module,
                           std::string const& class_name,
@@ -98,7 +102,9 @@ class Loader
     bool ignore_unknown() const { return ignore_unknown_; }
 
     void memorize_load(hid_t h5obj, std::shared_ptr<void> obj);
-    void memorize_load(hid_t h5obj, void* raw); // non-owning raw pointer stored as shared_ptr with no-op deleter
+    void memorize_load(
+      hid_t h5obj,
+      void* raw); // non-owning raw pointer stored as shared_ptr with no-op deleter
     std::shared_ptr<void> lookup_memo(hid_t h5obj) const;
 
     std::string type_of(hid_t h5obj) const;

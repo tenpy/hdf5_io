@@ -55,24 +55,26 @@ void
 register_type(std::string module, std::string class_name, SaveFn save, LoadFn load)
 {
     std::lock_guard lock(registry_mutex());
-    registry()[{std::move(module), std::move(class_name)}] =
-      RegistryEntry{std::move(save), std::move(load)};
+    registry()[{ std::move(module), std::move(class_name) }] =
+      RegistryEntry{ std::move(save), std::move(load) };
 }
 
 bool
 has_registered_type(std::string const& module, std::string const& class_name)
 {
     std::lock_guard lock(registry_mutex());
-    return registry().contains({module, class_name});
+    return registry().contains({ module, class_name });
 }
 
 Saver::Saver(HighFive::Group root)
   : root_(std::move(root))
-{}
+{
+}
 
 Saver::Saver(HighFive::File& file)
   : root_(file.getGroup("/"))
-{}
+{
+}
 
 hid_t
 Saver::memorize_save(void const* identity, hid_t h5obj)
@@ -103,14 +105,14 @@ Saver::create_group_for_obj(std::string const& path, void const* identity)
     if (identity && already_saved(identity, existing)) {
         HighFive::Group g = group_from_hid(existing);
         check_hdf5(H5Iinc_ref(existing), "H5Iinc_ref");
-        return {std::move(g), ensure_trailing_slash(h5_object_name(existing))};
+        return { std::move(g), ensure_trailing_slash(h5_object_name(existing)) };
     }
     if (path == "/" || path.empty()) {
         check_hdf5(H5Iinc_ref(root_.getId()), "H5Iinc_ref");
-        return {group_from_hid(root_.getId()), "/"};
+        return { group_from_hid(root_.getId()), "/" };
     }
     HighFive::Group g = h5_create_group(root_, path);
-    return {std::move(g), ensure_trailing_slash(path)};
+    return { std::move(g), ensure_trailing_slash(path) };
 }
 
 void
@@ -229,14 +231,17 @@ Saver::save_exportable(std::string const& path,
     SaveFn save_fn;
     {
         std::lock_guard lock(registry_mutex());
-        auto it = registry().find({module, class_name});
+        auto it = registry().find({ module, class_name });
         if (it == registry().end())
             throw Hdf5ExportError("no registered save for " + module + "." + class_name);
         save_fn = it->second.save;
     }
-    return save_instance(path, module, class_name, identity, [&](Saver& s, HighFive::Group& g, std::string const& sub) {
-        save_fn(s, g, sub, obj);
-    });
+    return save_instance(
+      path,
+      module,
+      class_name,
+      identity,
+      [&](Saver& s, HighFive::Group& g, std::string const& sub) { save_fn(s, g, sub, obj); });
 }
 
 hid_t
@@ -266,12 +271,14 @@ Saver::save_instance(std::string const& path,
 Loader::Loader(HighFive::Group root, bool ignore_unknown)
   : root_(std::move(root))
   , ignore_unknown_(ignore_unknown)
-{}
+{
+}
 
 Loader::Loader(HighFive::File& file, bool ignore_unknown)
   : root_(file.getGroup("/"))
   , ignore_unknown_(ignore_unknown)
-{}
+{
+}
 
 void
 Loader::memorize_load(hid_t h5obj, std::shared_ptr<void> obj)
@@ -311,7 +318,8 @@ Loader::open(std::string const& path)
 
 void
 Loader::load_none(hid_t /*h5obj*/)
-{}
+{
+}
 
 bool
 Loader::load_bool(hid_t h5obj)
@@ -375,7 +383,7 @@ Loader::load_exportable(hid_t h5obj, std::string const& subpath)
     LoadFn load_fn;
     {
         std::lock_guard lock(registry_mutex());
-        auto it = registry().find({*module, *cls});
+        auto it = registry().find({ *module, *cls });
         if (it == registry().end()) {
             if (ignore_unknown_)
                 return nullptr;

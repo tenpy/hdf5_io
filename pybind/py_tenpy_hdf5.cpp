@@ -112,17 +112,18 @@ bind_tenpy_hdf5(py::module_& m)
            py::arg("hdf5_saver"),
            py::arg("h5gr"),
            py::arg("subpath"));
-    exportable.attr("from_hdf5") = py::module_::import_("builtins").attr("classmethod")(
-      py::cpp_function(
-        [](py::object cls, py::object hdf5_loader, py::object h5gr, std::string subpath) {
-            return Hdf5Exportable::from_hdf5(
-              std::move(cls), std::move(hdf5_loader), std::move(h5gr), std::move(subpath));
-        },
-        py::name("from_hdf5"),
-        py::arg("cls"),
-        py::arg("hdf5_loader"),
-        py::arg("h5gr"),
-        py::arg("subpath")));
+    exportable.attr("from_hdf5") =
+      py::module_::import_("builtins")
+        .attr("classmethod")(py::cpp_function(
+          [](py::object cls, py::object hdf5_loader, py::object h5gr, std::string subpath) {
+              return Hdf5Exportable::from_hdf5(
+                std::move(cls), std::move(hdf5_loader), std::move(h5gr), std::move(subpath));
+          },
+          py::name("from_hdf5"),
+          py::arg("cls"),
+          py::arg("hdf5_loader"),
+          py::arg("h5gr"),
+          py::arg("subpath")));
 
     py::class_<Hdf5Ignored>(m, "Hdf5Ignored")
       .def(py::init<std::string>(), py::arg("name") = "unknown")
@@ -274,10 +275,11 @@ bind_tenpy_hdf5(py::module_& m)
            py::arg("h5gr"),
            py::arg("obj"))
       .def("get_all_hdf5_keys", &Hdf5Loader::get_all_hdf5_keys, py::arg("h5_group") = py::none())
-      .def_static("get_attr",
-                  static_cast<py::object (*)(py::object, std::string const&)>(&Hdf5Loader::get_attr),
-                  py::arg("h5gr"),
-                  py::arg("attr_name"))
+      .def_static(
+        "get_attr",
+        static_cast<py::object (*)(py::object, std::string const&)>(&Hdf5Loader::get_attr),
+        py::arg("h5gr"),
+        py::arg("attr_name"))
       .def(
         "load_none",
         [type_info_str](
@@ -309,7 +311,8 @@ bind_tenpy_hdf5(py::module_& m)
         "load_converted_to_str",
         [type_info_str](
           Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
-            return self.load_converted_to_str(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+            return self.load_converted_to_str(
+              hid_from_h5py(h5gr), type_info_str(type_info), subpath);
         },
         py::arg("h5gr"),
         py::arg("type_info"),
@@ -399,7 +402,8 @@ bind_tenpy_hdf5(py::module_& m)
         "load_hdf5exportable",
         [type_info_str](
           Hdf5Loader& self, py::object h5gr, py::object type_info, std::string subpath) {
-            return self.load_hdf5exportable(hid_from_h5py(h5gr), type_info_str(type_info), subpath);
+            return self.load_hdf5exportable(
+              hid_from_h5py(h5gr), type_info_str(type_info), subpath);
         },
         py::arg("h5gr"),
         py::arg("type_info"),

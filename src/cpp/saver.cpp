@@ -103,8 +103,12 @@ Hdf5Saver::save_hid(py::object obj, std::string path)
     if (!obj_save_hdf5.is_none()) {
         auto [group, subpath] = create_group_for_obj(path, obj);
         h5_set_attr(group.getId(), ATTR_TYPE, std::string(REPR_HDF5EXPORTABLE));
-        h5_set_attr(group.getId(), ATTR_CLASS, py::cast<std::string>(obj.attr("__class__").attr("__qualname__")));
-        h5_set_attr(group.getId(), ATTR_MODULE, py::cast<std::string>(obj.attr("__class__").attr("__module__")));
+        h5_set_attr(group.getId(),
+                    ATTR_CLASS,
+                    py::cast<std::string>(obj.attr("__class__").attr("__qualname__")));
+        h5_set_attr(group.getId(),
+                    ATTR_MODULE,
+                    py::cast<std::string>(obj.attr("__class__").attr("__module__")));
         py::object h5gr = h5py_from_hid(group.getId());
         obj_save_hdf5(self_obj(this), h5gr, subpath);
         hid_t id = group.getId();
@@ -134,8 +138,8 @@ Hdf5Saver::save_hid(py::object obj, std::string path)
         py::object listitems = tup.size() > 3 ? tup[3] : py::none();
         py::object dictitems = tup.size() > 4 ? tup[4] : py::none();
         py::object state_setter = tup.size() > 5 ? tup[5] : py::none();
-        py::object pygr = save_reduce(
-          func, args, state, listitems, dictitems, state_setter, obj, to_str(path));
+        py::object pygr =
+          save_reduce(func, args, state, listitems, dictitems, state_setter, obj, to_str(path));
         hid_t id = hid_from_h5py(pygr);
         H5Iinc_ref(id);
         return id;
