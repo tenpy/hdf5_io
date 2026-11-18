@@ -13,18 +13,20 @@ It remains the reference Python implementation.
 C++ implementation
 ------------------
 
-The installable package ``hdf5_io`` (directory ``hdf5_io/``) provides the same public API via
-pybind11 bindings (``hdf5_io._core``). HDF5 groups, datasets, attributes, and hard links are
+The installable PyPI package ``tenpy-hdf5`` (import ``tenpy_hdf5``) provides the same public API via
+pybind11 bindings (``tenpy_hdf5._core``). HDF5 groups, datasets, attributes, and hard links are
 written through **libhdf5 + HighFive**, while callers still pass **h5py** ``File``/``Group``
 objects. On-disk format and Python API are backwards compatible with the reference module.
+
+The C++ library namespace and headers remain ``hdf5_io`` (``#include <hdf5_io/...>``).
 
 The build is split into:
 
 * ``hdf5_io_core`` — Python-free static library (``h5_ops``, ``core::Saver`` / ``core::Loader``,
-  type registry). Link this from C++ projects such as cyten (``HDF5_IO_BUILD_PYTHON=OFF``).
+  type registry). Link this from C++ projects such as lasyten (``HDF5_IO_BUILD_PYTHON=OFF``).
 * ``hdf5_io_py`` + ``_core`` — pybind11 / h5py facade (optional, default ON for pip installs).
 
-Build (editable install, similar to cyten)::
+Build (editable install)::
 
     pip install -v --no-build-isolation -C editable.rebuild=true -e .
 

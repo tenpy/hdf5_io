@@ -1,12 +1,12 @@
 [project]
-name = "hdf5_io"
+name = "tenpy-hdf5"
 version = "0.1.0"
 description = "Import and export of general Python objects to HDF5 (TeNPy format)"
 readme = {file = "README.rst", content-type = "text/x-rst"}
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 license = "Apache-2.0"
-keywords = ["hdf5", "h5py", "serialization"]
+keywords = ["hdf5", "h5py", "serialization", "tenpy"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -35,7 +35,7 @@ build-backend = "scikit_build_core.build"
 cmake.version = ">=3.15"
 build-dir = "build"
 cmake.build-type = "RelWithDebInfo"
-wheel.packages = ["hdf5_io"]
+wheel.packages = ["tenpy_hdf5"]
 
 [tool.scikit-build.cmake.define]
 BUILD_TESTING = {env = "BUILD_TESTING", default = "ON"}

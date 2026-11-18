@@ -4,5 +4,5 @@ add_test(NAME hdf5_io_core_roundtrip COMMAND test_core_roundtrip)
 
 if(HDF5_IO_BUILD_PYTHON AND Python_EXECUTABLE)
   add_test(NAME hdf5_io_smoke COMMAND ${Python_EXECUTABLE} -c
-    "import hdf5_io; assert hdf5_io.REPR_LIST == 'list'")
+    "import tenpy_hdf5; assert tenpy_hdf5.REPR_LIST == 'list'")
 endif()

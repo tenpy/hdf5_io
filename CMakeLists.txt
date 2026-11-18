@@ -149,7 +149,7 @@ if(HDF5_IO_BUILD_PYTHON)
     )
   endif()
 
-  install(TARGETS _core LIBRARY DESTINATION hdf5_io)
+  install(TARGETS _core LIBRARY DESTINATION tenpy_hdf5)
 endif()
 
 # #####################################################################
