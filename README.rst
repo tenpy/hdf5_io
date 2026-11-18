@@ -46,9 +46,28 @@ extension built against system/conda HDF5. Prefer the conda-forge stack in
 ``environment.yml``, or build h5py against that same library
 (``pip install --no-binary=h5py h5py``).
 
-Tests::
+Tests
+-----
 
-    pytest tests/
+Three entry points (all exercised in CI):
+
+1. **Reference pure-Python** (TeNPy v1 sync; no C++ build)::
+
+       cd src/python3 && PYTHONPATH=. pytest test_hdf5.py -vv
+
+2. **Installable ``tenpy_hdf5`` package** (nanobind + cross-compat with the reference)::
+
+       # Prefer conda-forge hdf5+h5py from environment.yml (same libhdf5).
+       pip install --no-build-isolation -e ".[test]"
+       pytest tests/ -vv
+       ctest --test-dir build --output-on-failure
+
+3. **Python-free core** (C++ consumers such as lasyten)::
+
+       cmake -S . -B build-core -DTENPY_HDF5_BUILD_PYTHON=OFF -DBUILD_TESTING=ON
+       cmake --build build-core && ctest --test-dir build-core
+
+``src/python2/`` is kept for conversion scripts only and is not in CI.
 
 To make the export and import feature really usefull, we need scripts to convert the data such that it can be
 imported/exported with other libraries except TeNPy.
